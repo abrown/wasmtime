@@ -20,6 +20,7 @@ use cranelift_entity::PrimaryMap;
 use cranelift_wasm::{DefinedFuncIndex, FuncIndex, FuncTranslator};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use std::vec::Vec;
+use cranelift_codegen::binemit::Reloc;
 
 /// Implementation of a relocation sink that just saves all the information for later
 pub struct RelocSink {
@@ -70,6 +71,11 @@ impl binemit::RelocSink for RelocSink {
             addend,
         });
     }
+
+    fn reloc_constant(&mut self, _: u32, _: Reloc, _: u32) {
+        // TODO implement
+    }
+
     fn reloc_jt(&mut self, offset: binemit::CodeOffset, reloc: binemit::Reloc, jt: ir::JumpTable) {
         self.func_relocs.push(Relocation {
             reloc,

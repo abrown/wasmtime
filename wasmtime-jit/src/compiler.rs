@@ -19,6 +19,7 @@ use wasmtime_environ::{
     Compilation, CompileError, Compiler as _C, FunctionBodyData, Module, Relocations, Tunables,
 };
 use wasmtime_runtime::{InstantiationError, SignatureRegistry, VMFunctionBody};
+use cranelift_codegen::binemit::Reloc;
 
 /// A WebAssembly code JIT compiler.
 ///
@@ -297,6 +298,9 @@ impl binemit::RelocSink for RelocSink {
         _addend: binemit::Addend,
     ) {
         panic!("trampoline compilation should not produce external symbol relocs");
+    }
+    fn reloc_constant(&mut self, _: u32, _: Reloc, _: u32) {
+        // TODO implement
     }
     fn reloc_jt(
         &mut self,
