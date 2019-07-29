@@ -220,6 +220,9 @@ fn main() {
         flag_builder.enable("enable_verifier").unwrap();
     }
 
+    // Enable SIMD
+    flag_builder.enable("enable_simd").unwrap();
+
     // Enable optimization if requested.
     if args.flag_optimize {
         flag_builder.set("opt_level", "best").unwrap();
