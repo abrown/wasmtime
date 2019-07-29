@@ -302,7 +302,11 @@ fn handle_module(context: &mut Context, args: &Args, path: &Path) -> Result<(), 
             .invoke(&mut instance, f, &[])
             .map_err(|e| e.to_string())?
         {
-            ActionOutcome::Returned { .. } => {}
+            ActionOutcome::Returned { values } => {
+                for v in values {
+                    println!("{}", v)
+                }
+            }
             ActionOutcome::Trapped { message } => {
                 return Err(format!("Trap from within function {}: {}", f, message));
             }
