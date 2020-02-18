@@ -1586,12 +1586,18 @@ fn define_simd(
     let regspill = shared.by_name("regspill");
     let sadd_sat = shared.by_name("sadd_sat");
     let scalar_to_vector = shared.by_name("scalar_to_vector");
+    let sload8x8 = shared.by_name("sload8x8");
+    let sload16x4 = shared.by_name("sload16x4");
+    let sload32x2 = shared.by_name("sload32x2");
     let spill = shared.by_name("spill");
     let sqrt = shared.by_name("sqrt");
     let sshr_imm = shared.by_name("sshr_imm");
     let ssub_sat = shared.by_name("ssub_sat");
     let store = shared.by_name("store");
     let uadd_sat = shared.by_name("uadd_sat");
+    let uload8x8 = shared.by_name("uload8x8");
+    let uload16x4 = shared.by_name("uload16x4");
+    let uload32x2 = shared.by_name("uload32x2");
     let ushr_imm = shared.by_name("ushr_imm");
     let usub_sat = shared.by_name("usub_sat");
     let vconst = shared.by_name("vconst");
@@ -1866,6 +1872,44 @@ fn define_simd(
         e.enc_32_64(bound_copy, rec_furm.opcodes(&MOVAPS_LOAD));
         let bound_copy_nop = copy_nop.bind(vector(ty, sse_vector_size));
         e.enc_32_64_rec(bound_copy_nop, rec_stacknull, 0);
+    }
+
+    // SIMD load extend
+    for (inst, opcodes) in &[
+        (uload8x8, &PMOVZXBW),
+        (uload16x4, &PMOVZXWD),
+        (uload32x2, &PMOVZXDQ),
+        (sload8x8, &PMOVSXBW),
+        (sload16x4, &PMOVSXWD),
+        (sload32x2, &PMOVSXDQ),
+    ] {
+        let inst = *inst;
+        let template = rec_fld.opcodes(*opcodes);
+        e.enc32_maybe_isap(
+            inst.clone().bind(I32),
+            template.clone(),
+            Some(use_sse41_simd),
+        );
+        // REX-less encoding must come after REX encoding so we don't use it by
+        // default. Otherwise reg-alloc would never use r8 and up.
+        e.enc64_maybe_isap(
+            inst.clone().bind(I32),
+            template.clone().rex(),
+            Some(use_sse41_simd),
+        );
+        e.enc64_maybe_isap(
+            inst.clone().bind(I32),
+            template.clone(),
+            Some(use_sse41_simd),
+        );
+        // Similar to above; TODO some of this duplication can be cleaned up by infer_rex()
+        // tracked in https://github.com/bytecodealliance/cranelift/issues/1090
+        e.enc64_maybe_isap(
+            inst.clone().bind(I64),
+            template.clone().rex(),
+            Some(use_sse41_simd),
+        );
+        e.enc64_maybe_isap(inst.clone().bind(I64), template, Some(use_sse41_simd));
     }
 
     // SIMD integer addition

@@ -1,0 +1,10 @@
+test binemit
+set enable_simd
+target x86_64 skylake
+
+function %load_extend() {
+block0:
+    [-,%rdx]     v1 = iconst.i64 0x0123_4567_89ab_cdef
+    [-,%xmm1]    v2 = uload8x8 v1  ; bin: heap_oob 66 40 0f 38 30 0a
+    return
+}
