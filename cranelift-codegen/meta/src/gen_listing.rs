@@ -26,17 +26,17 @@ fn emit_listings(_: &SharedDefinitions, isa: &TargetIsa, fmt: &mut Formatter) {
         // Print each encoding.
         for encoding in &sorted_encodings {
             // TODO remove SIMD filter
-            if encoding
-                .bound_type
-                .as_ref()
-                .filter(|ty| ty.lane_count() > 1)
-                .is_some()
-            {
-                let printable = DisplayEncoding::new(encoding, isa);
-                fmtln!(fmt, "{}", printable);
-                let counter = recipe_counter.entry(encoding.recipe).or_insert(0);
-                *counter += 1;
-            }
+            // if encoding
+            //     .bound_type
+            //     .as_ref()
+            //     .filter(|ty| ty.lane_count() > 1)
+            //     .is_some()
+            // {
+            let printable = DisplayEncoding::new(encoding, isa);
+            fmtln!(fmt, "{}", printable);
+            let counter = recipe_counter.entry(encoding.recipe).or_insert(0);
+            *counter += 1;
+            // }
         }
         fmtln!(fmt, "");
     }

@@ -5,6 +5,8 @@ target x86_64 skylake
 function %load_extend() {
 block0:
     [-,%rdx]     v1 = iconst.i64 0x0123_4567_89ab_cdef
-    [-,%xmm1]    v2 = uload8x8 v1  ; bin: heap_oob 66 40 0f 38 30 0a
+    [-,%rax]     v2 = iconst.i32 0x0123_4567
+    [-,%xmm1]    v3 = uload8x8 v1+0  ; bin: heap_oob 66 40 0f 38 30 0a
+    [-,%xmm2]    v4 = uload8x8 v1+20  ; bin: heap_oob 66 40 0f 38 30 0a
     return
 }

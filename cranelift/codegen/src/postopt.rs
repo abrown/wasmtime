@@ -271,6 +271,7 @@ fn optimize_complex_addresses(pos: &mut EncCursor, inst: Inst, isa: &dyn TargetI
                         .replace(inst)
                         .sload32_complex(info.flags, &args, info.offset);
                 }
+                Opcode::Uload8x8 => panic!("optimization attempt"),
                 Opcode::Store => {
                     pos.func.dfg.replace(inst).store_complex(
                         info.flags,
