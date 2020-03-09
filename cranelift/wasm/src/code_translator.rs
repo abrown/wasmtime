@@ -1491,9 +1491,8 @@ pub fn translate_operator<FE: FuncEnvironment + ?Sized>(
             state.push1(builder.ins().fabs(a))
         }
         Operator::F32x4ConvertI32x4S => {
-            let ty = type_of(op);
-            let a = pop1_with_bitcast(state, ty, builder);
-            state.push1(builder.ins().fcvt_from_sint(ty, a))
+            let a = pop1_with_bitcast(state, I32X4, builder);
+            state.push1(builder.ins().fcvt_from_sint(F32X4, a))
         }
         Operator::I8x16Shl
         | Operator::I8x16ShrS
