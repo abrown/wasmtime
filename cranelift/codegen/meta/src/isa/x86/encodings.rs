@@ -343,6 +343,7 @@ impl PerCpuModeEncodings {
     /// Add the same encoding/template pairing to both X86_32 and X86_64
     fn enc_32_64(&mut self, inst: impl Clone + Into<InstSpec>, template: Template) {
         self.enc32(inst.clone(), template.clone());
+        self.enc64(inst.clone(), template.clone().rex());
         self.enc64(inst, template);
     }
 
