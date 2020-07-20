@@ -32,6 +32,11 @@ resolution.",
             proc_exit => wasi_proc_exit
           }
         },
+        wasi_ephemeral_nn => {
+          name: WasiNN,
+          docs: "TODO",
+          function_override: {}
+        }
     },
     // Error to return when caller module is missing memory export:
     missing_memory: { wasi_common::wasi::types::Errno::Inval },
