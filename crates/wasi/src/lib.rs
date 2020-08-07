@@ -31,11 +31,6 @@ resolution.",
           function_override: {
             proc_exit => wasi_proc_exit
           }
-        },
-        wasi_ephemeral_nn => {
-          name: WasiNN,
-          docs: "TODO",
-          function_override: {}
         }
     },
     // Error to return when caller module is missing memory export:
