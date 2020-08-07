@@ -22,5 +22,5 @@ wasmtime_wiggle::wasmtime_integration!({
         }
     },
     // Error to return when caller module is missing memory export:
-    missing_memory: { witx::Errno::MissingMemory }, // TODO is this necessary?
+    missing_memory: { witx::types::Errno::MissingMemory }, // TODO is this necessary?
 });
