@@ -80,6 +80,7 @@ impl ExecutionContext {
     }
 }
 
+/// Capture the state necessary for calling into `openvino`.
 pub struct Ctx {
     pub(crate) core: openvino::Core,
     pub(crate) graphs: Table<Graph, (openvino::CNNNetwork, openvino::ExecutableNetwork)>,
@@ -90,7 +91,7 @@ impl Ctx {
     /// Make a new `WasiNnCtx` with the default settings.
     pub fn new() -> WasiNnResult<Self> {
         Ok(Self {
-            core: openvino::Core::new(None), // TODO handle error
+            core: openvino::Core::new(None)?,
             graphs: Table::default(),
             executions: Table::default(),
         })

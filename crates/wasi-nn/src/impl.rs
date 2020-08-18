@@ -6,7 +6,7 @@ use crate::witx::types::{
 };
 use crate::witx::wasi_ephemeral_nn::WasiEphemeralNn;
 use crate::WasiNnCtx;
-use openvino::TensorDesc;
+use openvino::{Layout, Precision, TensorDesc};
 use thiserror::Error;
 use wiggle::GuestPtr;
 
@@ -44,12 +44,12 @@ impl<'a> WasiEphemeralNn for WasiNnCtx {
             .ctx
             .borrow_mut()
             .core
-            .read_network_buffer(&xml, &weights)?;
+            .read_network_from_buffer(&xml, &weights)?;
         let executable_graph = self
             .ctx
             .borrow_mut()
             .core
-            .load_network(&graph, &target.to_string());
+            .load_network(&graph, &target.to_string())?;
         let id = self
             .ctx
             .borrow_mut()
@@ -60,7 +60,7 @@ impl<'a> WasiEphemeralNn for WasiNnCtx {
 
     fn init_execution_context(&self, graph: Graph) -> Result<GraphExecutionContext> {
         if let Some((_, executable_graph)) = self.ctx.borrow_mut().graphs.get_mut(graph) {
-            let request = executable_graph.create_infer_request();
+            let request = executable_graph.create_infer_request()?;
             let execution_context = ExecutionContext::new(graph, request);
             let handle = self.ctx.borrow_mut().executions.insert(execution_context);
             Ok(handle)
@@ -91,13 +91,13 @@ impl<'a> WasiEphemeralNn for WasiNnCtx {
                 .map(|d| *d as u64)
                 .collect::<Vec<_>>();
             let precision = match tensor.type_ {
-                TensorType::F16 => openvino::c::precision_e_FP16,
-                TensorType::F32 => openvino::c::precision_e_FP32,
-                TensorType::U8 => openvino::c::precision_e_U8,
-                TensorType::I32 => openvino::c::precision_e_I32,
+                TensorType::F16 => Precision::FP16,
+                TensorType::F32 => Precision::FP32,
+                TensorType::U8 => Precision::U8,
+                TensorType::I32 => Precision::I32,
             };
             // TODO how to discover layout?
-            let desc = TensorDesc::new(openvino::c::layout_e_NHWC, &dimensions, precision);
+            let desc = TensorDesc::new(Layout::NHWC, &dimensions, precision);
             let data = tensor.data.as_slice()?;
             let blob = openvino::Blob::new(desc, &data)?;
 
