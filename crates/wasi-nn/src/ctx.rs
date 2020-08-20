@@ -120,6 +120,6 @@ mod test {
 
     #[test]
     fn instantiate() {
-        WasiNnCtx::new();
+        WasiNnCtx::new().unwrap();
     }
 }

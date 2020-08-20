@@ -2556,7 +2556,6 @@ dependencies = [
  "wasmtime-obj",
  "wasmtime-runtime",
  "wasmtime-wasi",
- "wasmtime-wasi-nn",
  "wasmtime-wast",
  "wat",
 ]
@@ -2767,6 +2766,7 @@ dependencies = [
  "log",
  "openvino",
  "thiserror",
+ "toml",
  "wasmtime",
  "wasmtime-runtime",
  "wasmtime-wasi",

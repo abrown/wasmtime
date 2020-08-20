@@ -30,7 +30,6 @@ wasmtime-jit = { path = "crates/jit", version = "0.20.0" }
 wasmtime-obj = { path = "crates/obj", version = "0.20.0" }
 wasmtime-wast = { path = "crates/wast", version = "0.20.0" }
 wasmtime-wasi = { path = "crates/wasi", version = "0.20.0" }
-wasmtime-wasi-nn = { path = "crates/wasi-nn", version = "0.1.0" }
 wasi-common = { path = "crates/wasi-common", version = "0.20.0" }
 structopt = { version = "0.3.5", features = ["color", "suggestions"] }
 object = { version = "0.21.1", default-features = false, features = ["write"] }
@@ -70,6 +69,7 @@ members = [
   "crates/misc/rust",
   "crates/wiggle",
   "crates/wiggle/wasmtime",
+  "crates/wasi-nn",
   "examples/fib-debug/wasm",
   "examples/wasi/wasm",
   "examples/wasi-fs/wasm",
