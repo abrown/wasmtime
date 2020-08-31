@@ -44,5 +44,7 @@ fn simple() {
     assert_eq!(1, 1);
 }
 
+include!("tests/generated.rs");
+
 // See build.rs:
 include!(concat!(env!("OUT_DIR"), "/tests.rs"));
