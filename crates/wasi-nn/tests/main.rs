@@ -1,12 +1,13 @@
-use anyhow::Result;
+use anyhow::Result as AnyhowResult;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use wasmtime::{Linker, Module, Store};
 use wasmtime_wasi::{Wasi, WasiCtxBuilder};
 use wasmtime_wasi_nn::{WasiNn, WasiNnCtx};
 
-/// Execute the Wasm `file` with the given `preopen` using both the wasi and wasi-nn APIs.
-fn execute_wasi_nn_program(preopen: impl AsRef<Path>, file: impl AsRef<Path>) -> Result<()> {
+/// Execute the Wasm `file` with the given `preopen` using both the wasi and wasi-nn APIs. This is
+/// used by the generated tests to execute wasi-nn programs (see [example](example)).
+fn execute_wasi_nn_program(preopen: impl AsRef<Path>, file: impl AsRef<Path>) -> AnyhowResult<()> {
     println!("Executing: {}", file.as_ref().display());
     let store = Store::default();
     let mut linker = Linker::new(&store);
@@ -26,10 +27,6 @@ fn execute_wasi_nn_program(preopen: impl AsRef<Path>, file: impl AsRef<Path>) ->
     // Do the same for a `WasiNn` instance.
     let wasi_nn = WasiNn::new(&store, WasiNnCtx::new()?);
     wasi_nn.add_to_linker(&mut linker)?;
-    println!("load: {:?}", wasi_nn.get_export("load").unwrap().ty());
-
-    linker.func("env", "foo", |x: u32| x * 2)?;
-    linker.func("wasi_nn", "bar", |x: u32| x * 3)?;
 
     // Instantiate our module with the imports we've created, and run it.
     let module = Module::from_file(store.engine(), file)?;
@@ -43,8 +40,6 @@ fn execute_wasi_nn_program(preopen: impl AsRef<Path>, file: impl AsRef<Path>) ->
 fn simple() {
     assert_eq!(1, 1);
 }
-
-include!("tests/generated.rs");
 
 // See build.rs:
 include!(concat!(env!("OUT_DIR"), "/tests.rs"));

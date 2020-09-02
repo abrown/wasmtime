@@ -1,7 +1,8 @@
-# OpenVINO Test Fixture
+# Test Fixture
 
-In order to test the use of `openvino-rs` in the real world, here we include the necessary files for performing the
-classification in [classify.rs](../classify.rs). The following list describes how these files were collected:
+In order to test the use of `wasi-nn` in the real world, here we include the necessary files for performing the
+classification in the [wasi-nn example](../example/src/main.rs). The following list describes how these files were 
+collected:
 
 - Download a SSD MobileNet pre-trained model from the TensorFlow [model zoo] and extract it somewhere:
   ```shell script
@@ -25,8 +26,16 @@ classification in [classify.rs](../classify.rs). The following list describes ho
   unzip -Z1 val2017.zip | head -n 20 | xargs unzip val2017.zip
   ```
 
-- Optionally, build the OpenVINO example classifier (i.e. `hello_classification`) and verify that the results match
-those in `example.rs`:
+- The [wasi-nn example](../example/src/main.rs) does not know how to decode images, so we must convert the image into an
+encoding it understands--a raw tensor of f32 pixels in blue-green-red (BGR) order. To do this, we can use ImageMagick:
   ```shell script
-  ../../upstream/bin/intel64/Release/hello_classification frozen_inference_graph.xml val2017/000000231527.jpg CPU
+  # Possibly install ImageMagick, e.g.: dnf install ImageMagick
+  # Optionally examine the image to convert:
+  identify val2017/000000062808.jpg
+  # Convert the image. Note that we force the size and precision (i.e. depth) to match the input in 
+  # `frozen_inference_graph.xml` and note that the file extension is necessary for informing ImageMagick of the 
+  # encoding format:
+  convert -resize "300x300!" -define quantum:format=floating-point -depth 32 val2017/000000062808.jpg tensor-1x3x300x300-f32.bgr
+  # Optionally examine the converted tensor:
+  identify -size "300x300" -define quantum:format=floating-point -depth 32 tensor-1x3x300x300-f32.bgr
   ```
