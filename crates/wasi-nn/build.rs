@@ -14,16 +14,6 @@ fn main() {
     let wasi_root = PathBuf::from(".").canonicalize().unwrap();
     println!("cargo:rustc-env=WASI_ROOT={}", wasi_root.display());
 
-    // TODO Remove this; only necessary for manually-set OPENVINO_LIB_DIR paths
-    let prebuilt_openvino =
-        PathBuf::from("../../../openvino-rs/crates/upstream/build/bin/intel64/Release/lib")
-            .canonicalize()
-            .unwrap();
-    println!(
-        "cargo:rustc-env=LD_LIBRARY_PATH={}",
-        prebuilt_openvino.display()
-    );
-
     let project_dir = PathBuf::from(".").canonicalize().unwrap();
     let example_project_dir = project_dir.join("tests/example");
     let out_dir =

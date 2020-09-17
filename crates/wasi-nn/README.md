@@ -37,3 +37,10 @@ An end-to-end test demonstrating ML classification is included in [tests]:
  - `build.rs` is responsible for compiling `tests/example` and generating a test to run the example
  - `tests/main.rs` includes the generated test and runs by setting up a Wasm instance and linking in the wasi-nn
    implementation in this crate
+
+Run the tests (shown here using an existing OpenVINO™ installation):
+
+```
+source /opt/intel/openvino/bin/setupvars.sh
+OPENVINO_INSTALL_DIR=/opt/intel/openvino cargo test -v
+```

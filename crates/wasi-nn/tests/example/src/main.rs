@@ -17,15 +17,15 @@ pub fn main() {
         )
         .unwrap()
     };
-    println!("graph handle: {}", graph);
+    println!("Graph handle ID: {}", graph);
 
     let context = unsafe { wasi_nn::init_execution_context(graph).unwrap() };
-    println!("execution context: {}", context);
+    println!("Execution context ID: {}", context);
 
     // Load a tensor that precisely matches the graph input tensor (see
     // `fixture/frozen_inference_graph.xml`).
     let tensor_data = fs::read("fixture/tensor-1x3x300x300-f32.bgr").unwrap();
-    println!("tensor bytes: {}", tensor_data.len());
+    println!("Tensor bytes: {}", tensor_data.len());
     let tensor = wasi_nn::Tensor {
         dimensions: &[1, 3, 300, 300],
         r#type: wasi_nn::TENSOR_TYPE_F32,
@@ -50,5 +50,5 @@ pub fn main() {
             (output_buffer.len() * 4).try_into().unwrap(),
         );
     }
-    println!("output tensor: {:?}", &output_buffer[..100])
+    println!("output tensor: {:?}", &output_buffer[..1000])
 }
