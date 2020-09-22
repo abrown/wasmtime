@@ -702,54 +702,71 @@ fn lower_insn_to_regs<C: LowerCtx<I = Inst>>(
         }
 
         Opcode::Ishl | Opcode::Ushr | Opcode::Sshr | Opcode::Rotl | Opcode::Rotr => {
+            let dst = get_output_reg(ctx, outputs[0]);
             let dst_ty = ctx.output_ty(insn, 0);
             debug_assert_eq!(ctx.input_ty(insn, 0), dst_ty);
 
-            let (size, lhs) = match dst_ty {
-                types::I8 | types::I16 => match op {
-                    Opcode::Ishl => (4, put_input_in_reg(ctx, inputs[0])),
-                    Opcode::Ushr => (
-                        4,
-                        extend_input_to_reg(ctx, inputs[0], ExtSpec::ZeroExtendTo32),
-                    ),
-                    Opcode::Sshr => (
-                        4,
-                        extend_input_to_reg(ctx, inputs[0], ExtSpec::SignExtendTo32),
-                    ),
-                    Opcode::Rotl | Opcode::Rotr => {
+            if !dst_ty.is_vector() {
+                let (size, lhs) = match dst_ty {
+                    types::I8 | types::I16 => match op {
+                        Opcode::Ishl => (4, put_input_in_reg(ctx, inputs[0])),
+                        Opcode::Ushr => (
+                            4,
+                            extend_input_to_reg(ctx, inputs[0], ExtSpec::ZeroExtendTo32),
+                        ),
+                        Opcode::Sshr => (
+                            4,
+                            extend_input_to_reg(ctx, inputs[0], ExtSpec::SignExtendTo32),
+                        ),
+                        Opcode::Rotl | Opcode::Rotr => {
+                            (dst_ty.bytes() as u8, put_input_in_reg(ctx, inputs[0]))
+                        }
+                        _ => unreachable!(),
+                    },
+                    types::I32 | types::I64 => {
                         (dst_ty.bytes() as u8, put_input_in_reg(ctx, inputs[0]))
                     }
+                    _ => unreachable!("unhandled output type for shift/rotates: {}", dst_ty),
+                };
+
+                let (count, rhs) = if let Some(cst) = ctx.get_input(insn, 1).constant {
+                    // Mask count, according to Cranelift's semantics.
+                    let cst = (cst as u8) & (dst_ty.bits() as u8 - 1);
+                    (Some(cst), None)
+                } else {
+                    (None, Some(put_input_in_reg(ctx, inputs[1])))
+                };
+
+                let shift_kind = match op {
+                    Opcode::Ishl => ShiftKind::ShiftLeft,
+                    Opcode::Ushr => ShiftKind::ShiftRightLogical,
+                    Opcode::Sshr => ShiftKind::ShiftRightArithmetic,
+                    Opcode::Rotl => ShiftKind::RotateLeft,
+                    Opcode::Rotr => ShiftKind::RotateRight,
                     _ => unreachable!(),
-                },
-                types::I32 | types::I64 => (dst_ty.bytes() as u8, put_input_in_reg(ctx, inputs[0])),
-                _ => unreachable!("unhandled output type for shift/rotates: {}", dst_ty),
-            };
+                };
 
-            let (count, rhs) = if let Some(cst) = ctx.get_input(insn, 1).constant {
-                // Mask count, according to Cranelift's semantics.
-                let cst = (cst as u8) & (dst_ty.bits() as u8 - 1);
-                (Some(cst), None)
+                let w_rcx = Writable::from_reg(regs::rcx());
+                ctx.emit(Inst::mov_r_r(true, lhs, dst));
+                if count.is_none() {
+                    ctx.emit(Inst::mov_r_r(true, rhs.unwrap(), w_rcx));
+                }
+                ctx.emit(Inst::shift_r(size, shift_kind, count, dst));
             } else {
-                (None, Some(put_input_in_reg(ctx, inputs[1])))
-            };
-
-            let dst = get_output_reg(ctx, outputs[0]);
-
-            let shift_kind = match op {
-                Opcode::Ishl => ShiftKind::ShiftLeft,
-                Opcode::Ushr => ShiftKind::ShiftRightLogical,
-                Opcode::Sshr => ShiftKind::ShiftRightArithmetic,
-                Opcode::Rotl => ShiftKind::RotateLeft,
-                Opcode::Rotr => ShiftKind::RotateRight,
-                _ => unreachable!(),
-            };
-
-            let w_rcx = Writable::from_reg(regs::rcx());
-            ctx.emit(Inst::mov_r_r(true, lhs, dst));
-            if count.is_none() {
-                ctx.emit(Inst::mov_r_r(true, rhs.unwrap(), w_rcx));
+                let sse_op = match (dst_ty, op) {
+                    (types::I16X8, Opcode::Ishl) => SseOpcode::Psllw,
+                    (types::I32X4, Opcode::Ishl) => SseOpcode::Pslld,
+                    (types::I64X2, Opcode::Ishl) => SseOpcode::Psllq,
+                    (types::I16X8, Opcode::Sshr) => SseOpcode::Psraw,
+                    (types::I32X4, Opcode::Sshr) => SseOpcode::Psrad,
+                    (types::I16X8, Opcode::Ushr) => SseOpcode::Psrlw,
+                    (types::I32X4, Opcode::Ushr) => SseOpcode::Psrld,
+                    (types::I64X2, Opcode::Ushr) => SseOpcode::Psrlq,
+                    _ => unimplemented!("TODO implement legalizations from https://github.com/bytecodealliance/wasmtime/blob/c5a69cee9fbd767b43ddacf934cfc91ab8fc9dd5/cranelift/codegen/src/isa/x86/enc_tables.rs#L1770-L1804")
+                };
+                ctx.emit(Inst::gpr_to_xmm(...))
+                ctx.emit(Inst::xmm_rmi_reg(sse_op, RegMemImm::imm(32), lhs_1))
             }
-            ctx.emit(Inst::shift_r(size, shift_kind, count, dst));
         }
 
         Opcode::Ineg => {
