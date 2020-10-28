@@ -77,3 +77,41 @@ block2:
 ; nextln:     v2 = iconst.i32 24
 ; nextln:     return v2
 ; nextln: }
+
+; Example demonstrating the limits of SSCP:
+function %loop(i32) -> i32 {
+block0(v0: i32):
+    v1 = iconst.i32 42
+    jump block1(v1, v0)
+block1(v10: i32, v11: i32):
+    ; We know that the output of this loop is constant: we continually add 0 to it. SSCP should replace this with
+    ; v15 = const.i32 42
+    v15 = iadd_imm v10, 0
+    ; Loop using counter in v11.
+    v16 = iadd_imm v11, -1
+    v17 = icmp_imm sgt v16, 0
+    brnz v17, block1(v15, v16)
+    ; Exit once we count down to 0.
+    jump block2(v15)
+block2(v20: i32):
+    ; At this point, SSCP should know that v10 = 42, but the loop remains since we do not have an optimization that can
+    ; prove the loop useless and remove it.
+    v21 = iadd_imm v20, 1
+    return v21
+}
+; sameln: function %loop(i32) -> i32 fast {
+; nextln: block0(v0: i32):
+; nextln:     v1 = iconst.i32 42
+; nextln:     jump block1(v1, v0)
+; nextln: 
+; nextln: block1(v10: i32, v11: i32):
+; nextln:     v15 = iconst.i32 42
+; nextln:     v16 = iadd_imm v11, -1
+; nextln:     v17 = icmp_imm sgt v16, 0
+; nextln:     brnz v17, block1(v15, v16)
+; nextln:     jump block2(v15)
+; nextln: 
+; nextln: block2(v20: i32):
+; nextln:     v21 = iconst.i32 43
+; nextln:     return v21
+; nextln: }
