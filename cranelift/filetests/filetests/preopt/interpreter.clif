@@ -1,0 +1,88 @@
+test preopt
+target x86_64
+
+;; Attempt to determine if SSCP will be able to `return 2` like Clang does. It can!
+
+function %interpret() -> i32 system_v {
+block0:
+  v0 = iconst.i32 0 ;; accumulator
+  v1 = iconst.i32 0 ;; index
+
+
+  ;; first instruction
+  v2 = iconst.i32 2 ;; code[index]... no way Cranelift optimizations (i.e. redundant_reload_remover) can optimize this away so we do it manually here
+  v3 = icmp_imm ne v2, 2
+  brnz v3, block99
+  fallthrough block1(v0, v1)
+block1(v10: i32, v11: i32):
+  v12 = iadd_imm v10, 1
+  v13 = iadd_imm v11, 1
+
+
+  ;; second instruction
+  v14 = iconst.i32 3 ;; code[index]
+  v15 = icmp_imm ne v14, 3
+  brnz v15, block99
+  fallthrough block2(v12, v13)
+block2(v20: i32, v21: i32):
+  v22 = icmp_imm sle v20, 0
+  brnz v22, block99
+  fallthrough block3(v20, v21)
+block3(v30: i32, v31: i32):
+  v32 = iadd_imm v31, 1
+  v33 = iadd_imm v32, 1
+
+
+  ;; third instruction
+  v34 = iconst.i32 2 ;; code[index]
+  v35 = icmp_imm ne v34, 2
+  brnz v35, block99
+  fallthrough block4(v30, v33)
+block4(v40: i32, v41: i32):
+  v42 = iadd_imm v40, 1
+  v43 = iadd_imm v41, 1
+  return v42
+
+
+;; trace guard failure
+block99:
+  trap user99
+}
+; sameln: function %interpret
+; nextln: block0:
+; nextln:     v0 = iconst.i32 0
+; nextln:     v1 = iconst.i32 0
+; nextln:     v2 = iconst.i32 2
+; nextln:     v3 = bconst.b1 false
+; nextln:     nop 
+; nextln:     fallthrough block1(v0, v1)
+; nextln: 
+; nextln: block1(v10: i32, v11: i32):
+; nextln:     v12 = iconst.i32 1
+; nextln:     v13 = iconst.i32 1
+; nextln:     v14 = iconst.i32 3
+; nextln:     v15 = bconst.b1 false
+; nextln:     nop 
+; nextln:     fallthrough block2(v12, v13)
+; nextln: 
+; nextln: block2(v20: i32, v21: i32):
+; nextln:     v22 = bconst.b1 false
+; nextln:     nop
+; nextln:     fallthrough block3(v20, v21)
+; nextln: 
+; nextln: block3(v30: i32, v31: i32):
+; nextln:     v32 = iconst.i32 2
+; nextln:     v33 = iconst.i32 3
+; nextln:     v34 = iconst.i32 2
+; nextln:     v35 = bconst.b1 false
+; nextln:     nop 
+; nextln:     fallthrough block4(v30, v33)
+; nextln: 
+; nextln: block4(v40: i32, v41: i32):
+; nextln:     v42 = iconst.i32 2
+; nextln:     v43 = iconst.i32 4
+; nextln:     return v42
+; nextln: 
+; nextln: block99:
+; nextln:     trap user99
+; nextln: }

@@ -1,0 +1,71 @@
+test dce
+target x86_64
+
+;; This takes the output of preopt (SSCP) and examines after DCE. The results could be better: unnecessary blocks with
+;; their unnecessary constant declarations probably should be eliminated. TODO run this through the whole compile
+;; pipeline--all passes-- to see what happens.
+
+function %interpret() -> i32 system_v {
+block0:
+    v0 = iconst.i32 0
+    v1 = iconst.i32 0
+    v2 = iconst.i32 2
+    v3 = bconst.b1 false
+    nop 
+    fallthrough block1(v0, v1)
+
+block1(v10: i32, v11: i32):
+    v12 = iconst.i32 1
+    v13 = iconst.i32 1
+    v14 = iconst.i32 3
+    v15 = bconst.b1 false
+    nop 
+    fallthrough block2(v12, v13)
+
+block2(v20: i32, v21: i32):
+    v22 = bconst.b1 false
+    nop
+    fallthrough block3(v20, v21)
+
+block3(v30: i32, v31: i32):
+    v32 = iconst.i32 2
+    v33 = iconst.i32 3
+    v34 = iconst.i32 2
+    v35 = bconst.b1 false
+    nop 
+    fallthrough block4(v30, v33)
+
+block4(v40: i32, v41: i32):
+    v42 = iconst.i32 2
+    v43 = iconst.i32 4
+    return v42
+
+block99:
+    trap user99
+}
+; sameln: function %interpret
+; nextln: block0:
+; nextln:     v0 = iconst.i32 0
+; nextln:     v1 = iconst.i32 0
+; nextln:     fallthrough block1(v0, v1)
+; nextln: 
+; nextln: block1(v10: i32, v11: i32):
+; nextln:     v12 = iconst.i32 1
+; nextln:     v13 = iconst.i32 1
+; nextln:     fallthrough block2(v12, v13)
+; nextln: 
+; nextln: block2(v20: i32, v21: i32):
+; nextln:     fallthrough block3(v20, v21)
+; nextln: 
+; nextln: block3(v30: i32, v31: i32):
+; nextln:     v33 = iconst.i32 3
+; nextln:     fallthrough block4(v30, v33)
+; nextln: 
+; nextln: block4(v40: i32, v41: i32):
+; nextln:     v42 = iconst.i32 2
+; nextln:     return v42
+; nextln: 
+; nextln: block99:
+; nextln:     trap user99
+; nextln: }
+
