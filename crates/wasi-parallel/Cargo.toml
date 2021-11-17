@@ -54,3 +54,8 @@ harness = false
 [[bench]]
 name = "arithmetic"
 harness = false
+
+[[bench]]
+name = "nstream_cpp"
+harness = false
+
