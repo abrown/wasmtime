@@ -3,7 +3,9 @@ extern crate ocl_core as core;
 use std::{
     any::Any,
     borrow::{Borrow, BorrowMut},
+    collections::{hash_map::DefaultHasher, HashMap},
     ffi::CString,
+    hash::{Hash, Hasher},
     sync::{Arc, Mutex},
 };
 
@@ -33,6 +35,7 @@ struct OpenClContext {
 
 struct Device {
     context: Arc<OpenClContext>,
+    program_cache: Mutex<HashMap<u64, core::Program>>,
 }
 
 impl Device {
@@ -50,6 +53,7 @@ impl Device {
                 device,
                 queue,
             }),
+            program_cache: Mutex::new(HashMap::new()),
         }))
     }
 }
@@ -93,22 +97,35 @@ impl super::Device for Device {
         in_buffers: Vec<&Box<dyn super::Buffer>>,
         out_buffers: Vec<&Box<dyn super::Buffer>>,
     ) -> anyhow::Result<()> {
-        // TODO: cache programs and maybe kernels
         let spirv = &kernel
             .spirv
             .context("SPIR-V not found in kernel function")?;
 
         let devices = [self.context.device.clone()];
 
-        let program = core::create_program_with_il(&self.context.context, &spirv, None)
-            .map_err(Error::msg)?;
+        let mut hasher = DefaultHasher::new();
+        spirv.hash(&mut hasher);
+        let spirv_hash = hasher.finish();
 
-        let options = CString::new("").expect("CString::new failed");
+        let kernel;
+        {
+            // TODO: evaluate using an LRU instead of a HashMap
+            let mut cache = self
+                .program_cache
+                .lock()
+                .map_err(|e| Error::msg(e.to_string()))?;
+            let program = cache.entry(spirv_hash).or_insert_with(|| {
+                let p = core::create_program_with_il(&self.context.context, &spirv, None).unwrap();
 
-        core::build_program(&program, Some(&devices), &options, None, None).map_err(Error::msg)?;
+                let options = CString::new("").expect("CString::new failed");
 
-        // TODO: we might need a better way to determine the entrypoint name
-        let kernel = core::create_kernel(&program, "spir_main").map_err(Error::msg)?;
+                core::build_program(&p, Some(&devices), &options, None, None).unwrap();
+                p
+            });
+
+            // TODO: we might need a better way to determine the entrypoint name
+            kernel = core::create_kernel(&program, "spir_main").map_err(Error::msg)?;
+        }
         let mut index = 0;
 
         // TODO: figure out a better way pass arguments to kernel
