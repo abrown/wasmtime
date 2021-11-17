@@ -72,7 +72,7 @@ for a higher-level implementation. ;)
     )
 
     (; Register the nstream kernel as reference-able ;)
-    (table (export "table") 1 funcref)
+    (table (export "__indirect_function_table") 1 funcref)
     (elem (i32.const 0) $nstream)
 
     (memory (export "memory") 0x800)

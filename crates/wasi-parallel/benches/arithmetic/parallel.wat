@@ -52,7 +52,7 @@ checking provided! ;)
     )
 
     (; Register the kernel as reference-able. ;)
-    (table (export "table") 1 funcref)
+    (table (export "__indirect_function_table") 1 funcref)
     (elem (i32.const 0) $add)
 
     (memory (export "memory") 1)
