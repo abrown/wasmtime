@@ -11,6 +11,7 @@ use super::{
     initialize_instance, InstanceAllocationRequest, InstanceAllocator, InstanceHandle,
     InstantiationError,
 };
+use crate::memory::MemoryAllocation;
 use crate::{instance::Instance, Memory, Mmap, Table};
 use crate::{MemoryImageSlot, ModuleRuntimeInfo, Store};
 use anyhow::{anyhow, bail, Context, Result};
@@ -452,8 +453,8 @@ impl InstancePool {
             let memory = mem::take(memory);
             assert!(memory.is_static());
 
-            match memory {
-                Memory::Static {
+            match memory.allocation {
+                MemoryAllocation::Static {
                     memory_image: Some(mut image),
                     ..
                 } => {

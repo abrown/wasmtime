@@ -1440,6 +1440,12 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
                 },
                 true,
             ),
+            MemoryPlan {
+                style: MemoryStyle::External(..),
+                offset_guard_size: _,
+                pre_guard_size: _,
+                memory: _,
+            } => todo!("probably a dynamic heap style, though"),
         };
 
         let heap_base = func.create_global_value(ir::GlobalValueData::Load {
