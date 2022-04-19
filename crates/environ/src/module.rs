@@ -10,7 +10,7 @@ use std::mem;
 use std::ops::{Index, Range};
 use wasmtime_types::*;
 
-/// Implemenation styles for WebAssembly linear memory.
+/// Implementation styles for WebAssembly linear memory.
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub enum MemoryStyle {
     /// The actual memory can be resized and moved.
@@ -18,16 +18,55 @@ pub enum MemoryStyle {
         /// Extra space to reserve when a memory must be moved due to growth.
         reserve: u64,
     },
-    /// Addresss space is allocated up front.
+    /// Address space is allocated up front.
     Static {
         /// The number of mapped and unmapped pages.
         bound: u64,
     },
+    /// Address space is pre-allocated externally, e.g., with external shared
+    /// memory. This variant is not serializable since it contains a raw pointer
+    /// address.
+    #[serde(skip)]
+    External(ExternalMemory),
+}
+
+/// A description of a slice of external memory.
+#[derive(Debug, Clone, Hash)]
+pub struct ExternalMemory {
+    /// The slice address.
+    pub base: usize,
+    /// The length of the slice.
+    pub len: usize,
 }
 
 impl MemoryStyle {
     /// Decide on an implementation style for the given `Memory`.
-    pub fn for_memory(memory: Memory, tunables: &Tunables) -> (Self, u64) {
+    pub fn for_memory(
+        memory: Memory,
+        tunables: &Tunables,
+        preallocation: Option<ExternalMemory>,
+    ) -> (Self, u64) {
+        // For shared memory, there are two cases:
+        //  - either we receive the memory allocated externally (see
+        //    `preallocation`)
+        //  - or we will pre-allocate all of the pages necessary to avoid ever
+        //    moving the shared memory during `grow` operations.
+        if memory.shared {
+            let bound = memory.maximum.expect(
+                "Wasm validation must guarantee that a shared memory must have an upper bound",
+            );
+            if let Some(preallocation) = preallocation {
+                assert_eq!(bound * WASM_PAGE_SIZE as u64, preallocation.len as u64);
+                return (Self::External(preallocation), 0);
+            } else {
+                assert!(bound <= tunables.static_memory_bound);
+                return (
+                    Self::Static { bound },
+                    tunables.static_memory_offset_guard_size,
+                );
+            }
+        }
+
         // A heap with a maximum that doesn't exceed the static memory bound specified by the
         // tunables make it static.
         //
@@ -84,8 +123,12 @@ pub struct MemoryPlan {
 
 impl MemoryPlan {
     /// Draw up a plan for implementing a `Memory`.
-    pub fn for_memory(memory: Memory, tunables: &Tunables) -> Self {
-        let (style, offset_guard_size) = MemoryStyle::for_memory(memory, tunables);
+    pub fn for_memory(
+        memory: Memory,
+        tunables: &Tunables,
+        preallocation: Option<ExternalMemory>,
+    ) -> Self {
+        let (style, offset_guard_size) = MemoryStyle::for_memory(memory, tunables, preallocation);
         Self {
             memory,
             style,
@@ -179,8 +222,8 @@ pub enum MemoryInitialization {
     /// or otherwise simply making the defined data visible.
     ///
     /// To be statically initialized the same requirements as `Paged` must be
-    /// met, namely that everything references a dfeined memory and all data
-    /// segments have a staitcally known in-bounds base (no globals).
+    /// met, namely that everything references a defined memory and all data
+    /// segments have a statically known in-bounds base (no globals).
     ///
     /// This form of memory initialization is a more optimized version of
     /// `Segmented` where memory can be initialized with one of a few methods:
@@ -191,7 +234,7 @@ pub enum MemoryInitialization {
     ///   which might reside in a compiled module on disk, available immediately
     ///   in a linear memory's address space.
     ///
-    /// To facilitate the latter fo these techniques the `try_static_init`
+    /// To facilitate the latter of these techniques the `try_static_init`
     /// function below, which creates this variant, takes a host page size
     /// argument which can page-align everything to make mmap-ing possible.
     Static {

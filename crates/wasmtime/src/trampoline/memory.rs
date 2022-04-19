@@ -7,15 +7,20 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use wasmtime_environ::{EntityIndex, MemoryPlan, MemoryStyle, Module, WASM_PAGE_SIZE};
 use wasmtime_runtime::{
-    MemoryImage, RuntimeLinearMemory, RuntimeMemoryCreator, VMMemoryDefinition,
+    MemoryImage, Mmap, RuntimeLinearMemory, RuntimeMemoryCreator, VMMemoryDefinition,
 };
 
-pub fn create_memory(store: &mut StoreOpaque, memory: &MemoryType) -> Result<InstanceId> {
+pub fn create_memory(
+    store: &mut StoreOpaque,
+    memory: &MemoryType,
+    preallocation: Option<&Mmap>,
+) -> Result<InstanceId> {
     let mut module = Module::new();
 
     let memory_plan = wasmtime_environ::MemoryPlan::for_memory(
         memory.wasmtime_memory().clone(),
         &store.engine().config().tunables,
+        preallocation.map(|p| p.as_external_memory()),
     );
     let memory_id = module.memory_plans.push(memory_plan);
     module
@@ -76,6 +81,7 @@ impl RuntimeMemoryCreator for MemoryCreatorProxy {
                 Some(usize::try_from(bound * (WASM_PAGE_SIZE as u64)).unwrap())
             }
             MemoryStyle::Dynamic { .. } => None,
+            MemoryStyle::External { .. } => None,
         };
         self.0
             .new_memory(

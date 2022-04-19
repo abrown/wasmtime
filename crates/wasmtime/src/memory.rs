@@ -4,6 +4,9 @@ use crate::{AsContext, AsContextMut, MemoryType, StoreContext, StoreContextMut};
 use anyhow::{bail, Result};
 use std::convert::TryFrom;
 use std::slice;
+use std::sync::Arc;
+use wasmtime_environ::WASM_PAGE_SIZE;
+use wasmtime_runtime::Mmap;
 
 /// Error for out of bounds [`Memory`] access.
 #[derive(Debug)]
@@ -227,7 +230,7 @@ impl Memory {
     /// # }
     /// ```
     pub fn new(mut store: impl AsContextMut, ty: MemoryType) -> Result<Memory> {
-        Memory::_new(store.as_context_mut().0, ty)
+        Memory::_new(store.as_context_mut().0, ty, None)
     }
 
     #[cfg_attr(nightlydoc, doc(cfg(feature = "async")))]
@@ -252,12 +255,47 @@ impl Memory {
             store.0.async_support(),
             "cannot use `new_async` without enabling async support on the config"
         );
-        store.on_fiber(|store| Memory::_new(store.0, ty)).await?
+        store
+            .on_fiber(|store| Memory::_new(store.0, ty, None))
+            .await?
     }
 
-    fn _new(store: &mut StoreOpaque, ty: MemoryType) -> Result<Memory> {
+    /// Creates a new WebAssembly memory given a [`SharedMemory`].
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use wasmtime::*;
+    /// # fn main() -> anyhow::Result<()> {
+    /// let mut config = Config::new();
+    /// config.wasm_threads(true);
+    /// let engine = Engine::new(&config)?;
+    /// let mut store = Store::new(&engine, ());
+    ///
+    /// let shared_memory = SharedMemory::new(1, 2)?;
+    /// let memory = Memory::from_shared_memory(&mut store, shared_memory)?;
+    /// let module = Module::new(&engine, "(module (memory (import \"\" \"\") 1 2 shared))")?;
+    /// let instance = Instance::new(&mut store, &module, &[memory.into()])?;
+    /// // ...
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_shared_memory(
+        mut store: impl AsContextMut,
+        shared_memory: SharedMemory,
+    ) -> Result<Self> {
+        let (mmap, ty) = &shared_memory.0.as_ref();
+        Memory::_new(store.as_context_mut().0, ty.clone(), Some(mmap))
+    }
+
+    fn _new(
+        store: &mut StoreOpaque,
+        ty: MemoryType,
+        preallocation: Option<&Mmap>,
+    ) -> Result<Memory> {
         unsafe {
-            let export = generate_memory_export(store, &ty)?;
+            let export = generate_memory_export(store, &ty, preallocation)?;
             Ok(Memory::from_wasmtime_memory(export, store))
         }
     }
@@ -453,7 +491,7 @@ impl Memory {
     /// This will attempt to add `delta` more pages of memory on to the end of
     /// this `Memory` instance. If successful this may relocate the memory and
     /// cause [`Memory::data_ptr`] to return a new value. Additionally any
-    /// unsafetly constructed slices into this memory may no longer be valid.
+    /// unsafely constructed slices into this memory may no longer be valid.
     ///
     /// On success returns the number of pages this memory previously had
     /// before the growth succeeded.
@@ -533,6 +571,7 @@ impl Memory {
         );
         store.on_fiber(|store| self.grow(store, delta)).await?
     }
+
     fn wasmtime_memory(&self, store: &mut StoreOpaque) -> *mut wasmtime_runtime::Memory {
         unsafe {
             let export = &store[self.0];
@@ -652,6 +691,58 @@ pub unsafe trait MemoryCreator: Send + Sync {
         reserved_size_in_bytes: Option<usize>,
         guard_size_in_bytes: usize,
     ) -> Result<Box<dyn LinearMemory>, String>;
+}
+
+/// A constructor for externally-created shared memory.
+///
+/// The [threads proposal] adds the concept of "shared memory" to WebAssembly.
+/// This is much the same as a Wasm linear memory (i.e., [`Memory`]), but can be
+/// used concurrently by multiple agents. Because these agents may execute in
+/// different threads, [`SharedMemory`] must be thread-safe.
+///
+/// When the threads proposal is enabled, there are multiple ways to construct
+/// shared memory:
+///  1. for imported shared memory, e.g., `(import "env" "memory" (memory 1 1
+///     shared))`, the user must supply a [`SharedMemory`] with the
+///     externally-created memory and convert it to a [`Memory`] prior to
+///     instantiation (see [Memory::from_shared_memory()]).
+///  2. for private or exported shared memory, e.g., `(export "env" "memory"
+///     (memory 1 1 shared))`, Wasmtime will create the memory internally during
+///     instantiation.
+///
+/// [threads proposal]:
+///     https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md
+#[derive(Clone)]
+pub struct SharedMemory(Arc<(Mmap, MemoryType)>);
+impl SharedMemory {
+    /// Construct a [`SharedMemory`] by providing both the `minimum` and
+    /// `maximum` number of 64K pages. This call allocates the necessary pages
+    /// on the system.
+    pub fn new(minimum: usize, maximum: usize) -> Result<Self> {
+        let mmap = Mmap::accessible_reserved(
+            minimum * WASM_PAGE_SIZE as usize,
+            maximum * WASM_PAGE_SIZE as usize,
+        )?;
+        let ty = MemoryType::shared(minimum as u64, maximum as u64);
+        Ok(Self(Arc::new((mmap, ty))))
+    }
+
+    /// Return the type of the shared memory.
+    pub fn ty(&self) -> MemoryType {
+        self.0.as_ref().1.clone()
+    }
+
+    /// Return read access to the available portion of the shared memory. Note
+    /// that the available pages may be between `[minimum, maximum]`.
+    pub fn data(&self) -> &[u8] {
+        todo!()
+    }
+
+    /// Return write access to the available portion of the shared memory. Note
+    /// that the available pages may be between `[minimum, maximum]`.
+    pub fn data_mut(&self) -> &[u8] {
+        todo!()
+    }
 }
 
 #[cfg(test)]
