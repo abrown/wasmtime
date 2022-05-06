@@ -1,5 +1,5 @@
-use std::sync::{Arc, RwLock};
 use anyhow::Result;
+use std::sync::{Arc, RwLock};
 use wasmtime::*;
 
 #[test]
@@ -44,8 +44,8 @@ fn test_share_external_memory() -> Result<()> {
     let engine = Engine::new(&config)?;
     let module = Module::new(&engine, wat)?;
     let mut store = Store::new(&engine, ());
-    let shared_memory = SharedMemory::new(1, 5)?;
-    let memory = Memory::from_shared_memory(&mut store, shared_memory)?;
+    let shared_memory = SharedMemory::new(&engine, MemoryType::shared(1, 5))?;
+    let memory = Memory::from_shared_memory(&mut store, &shared_memory)?;
     let _instance = Instance::new(&mut store, &module, &[memory.into()])?;
     Ok(())
 }
@@ -84,7 +84,7 @@ fn test_grow_memory_in_multiple_threads() -> Result<()> {
     config.wasm_threads(true);
     let engine = Arc::new(Engine::new(&config)?);
     let module = Arc::new(Module::new(&engine, wat)?);
-    let shared_memory = SharedMemory::new(1, 5)?;
+    let shared_memory = SharedMemory::new(&engine, MemoryType::shared(1, 5))?;
     let mut threads = vec![];
     let sizes = Arc::new(RwLock::new(vec![]));
 
@@ -97,7 +97,7 @@ fn test_grow_memory_in_multiple_threads() -> Result<()> {
         let shared_memory = shared_memory.clone();
         let thread = std::thread::spawn(move || {
             let mut store = Store::new(&engine, ());
-            let memory = Memory::from_shared_memory(&mut store, shared_memory).unwrap();
+            let memory = Memory::from_shared_memory(&mut store, &shared_memory).unwrap();
             let instance = Instance::new(&mut store, &module, &[memory.into()]).unwrap();
             let grow = instance
                 .get_typed_func::<i32, i32, _>(&mut store, "grow")

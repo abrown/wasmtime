@@ -11,7 +11,6 @@ use std::path::Path;
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
-use wasmtime_environ::ExternalMemory;
 
 /// A simple struct consisting of a page-aligned pointer to page-aligned
 /// and initially-zeroed memory and a length.
@@ -36,28 +35,6 @@ impl Mmap {
         Self {
             ptr: empty.as_ptr() as usize,
             len: 0,
-            file: None,
-        }
-    }
-
-    /// Construct an `Mmap` from a raw pointer and its length. See the
-    /// documentation for `Mmap` for why the arguments are `usize`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the pointer is not page-aligned and the
-    /// length is not a multiple of the page size.
-    pub unsafe fn from_raw_pointer(ptr: usize, len: usize) -> Self {
-        let page_size = region::page::size();
-        assert_eq!(ptr % page_size, 0, "the raw pointer must be page-aligned");
-        assert_eq!(
-            len & (page_size - 1),
-            0,
-            "the raw slice's length must be a multiple of the page size"
-        );
-        Self {
-            ptr,
-            len,
             file: None,
         }
     }
@@ -369,15 +346,6 @@ impl Mmap {
     /// Return the allocated memory as a mutable pointer to u8.
     pub fn as_mut_ptr(&self) -> *mut u8 {
         self.ptr as *mut u8
-    }
-
-    /// Return the allocated memory in a `wasmtime-environ`-accessible
-    /// structure.
-    pub fn as_external_memory(&self) -> ExternalMemory {
-        ExternalMemory {
-            base: self.ptr,
-            len: self.len,
-        }
     }
 
     /// Return the length of the allocated memory.

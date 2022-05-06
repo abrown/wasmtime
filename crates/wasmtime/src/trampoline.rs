@@ -19,7 +19,7 @@ use std::any::Any;
 use std::sync::Arc;
 use wasmtime_environ::{GlobalIndex, MemoryIndex, Module, SignatureIndex, TableIndex};
 use wasmtime_runtime::{
-    Imports, InstanceAllocationRequest, InstanceAllocator, Mmap, OnDemandInstanceAllocator,
+    Imports, InstanceAllocationRequest, InstanceAllocator, OnDemandInstanceAllocator, SharedMemory,
     StorePtr, VMFunctionImport, VMSharedSignatureIndex,
 };
 
@@ -68,7 +68,7 @@ pub fn generate_global_export(
 pub fn generate_memory_export(
     store: &mut StoreOpaque,
     m: &MemoryType,
-    preallocation: Option<&Mmap>,
+    preallocation: Option<SharedMemory>,
 ) -> Result<wasmtime_runtime::ExportMemory> {
     let instance = create_memory(store, m, preallocation)?;
     Ok(store

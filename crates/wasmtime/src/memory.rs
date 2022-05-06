@@ -1,12 +1,9 @@
 use crate::store::{StoreData, StoreOpaque, Stored};
 use crate::trampoline::generate_memory_export;
-use crate::{AsContext, AsContextMut, MemoryType, StoreContext, StoreContextMut};
+use crate::{AsContext, AsContextMut, Engine, MemoryType, StoreContext, StoreContextMut};
 use anyhow::{bail, Result};
 use std::convert::TryFrom;
 use std::slice;
-use std::sync::Arc;
-use wasmtime_environ::WASM_PAGE_SIZE;
-use wasmtime_runtime::Mmap;
 
 /// Error for out of bounds [`Memory`] access.
 #[derive(Debug)]
@@ -230,7 +227,7 @@ impl Memory {
     /// # }
     /// ```
     pub fn new(mut store: impl AsContextMut, ty: MemoryType) -> Result<Memory> {
-        Memory::_new(store.as_context_mut().0, ty, None)
+        Self::_new(store.as_context_mut().0, ty, None)
     }
 
     #[cfg_attr(nightlydoc, doc(cfg(feature = "async")))]
@@ -256,7 +253,7 @@ impl Memory {
             "cannot use `new_async` without enabling async support on the config"
         );
         store
-            .on_fiber(|store| Memory::_new(store.0, ty, None))
+            .on_fiber(|store| Self::_new(store.0, ty, None))
             .await?
     }
 
@@ -283,16 +280,25 @@ impl Memory {
     /// ```
     pub fn from_shared_memory(
         mut store: impl AsContextMut,
-        shared_memory: SharedMemory,
+        shared_memory: &SharedMemory,
     ) -> Result<Self> {
-        let (mmap, ty) = &shared_memory.0.as_ref();
-        Memory::_new(store.as_context_mut().0, ty.clone(), Some(mmap))
+        let store = store.as_context_mut();
+        if !Engine::same(store.engine(), shared_memory.engine()) {
+            bail!("cross-`Engine` instantiation is not currently supported");
+        }
+
+        // When we clone this shared memory, we only increment its reference
+        // count.
+        let mem = shared_memory.0.clone();
+
+        Self::_new(store.0, shared_memory.ty(), Some(mem))
     }
 
+    /// Helper function for attaching the memory to a "frankenstein" instance
     fn _new(
         store: &mut StoreOpaque,
         ty: MemoryType,
-        preallocation: Option<&Mmap>,
+        preallocation: Option<wasmtime_runtime::SharedMemory>,
     ) -> Result<Memory> {
         unsafe {
             let export = generate_memory_export(store, &ty, preallocation)?;
@@ -713,23 +719,32 @@ pub unsafe trait MemoryCreator: Send + Sync {
 /// [threads proposal]:
 ///     https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md
 #[derive(Clone)]
-pub struct SharedMemory(Arc<(Mmap, MemoryType)>);
+pub struct SharedMemory(wasmtime_runtime::SharedMemory, Engine);
 impl SharedMemory {
     /// Construct a [`SharedMemory`] by providing both the `minimum` and
-    /// `maximum` number of 64K pages. This call allocates the necessary pages
-    /// on the system.
-    pub fn new(minimum: usize, maximum: usize) -> Result<Self> {
-        let mmap = Mmap::accessible_reserved(
-            minimum * WASM_PAGE_SIZE as usize,
-            maximum * WASM_PAGE_SIZE as usize,
-        )?;
-        let ty = MemoryType::shared(minimum as u64, maximum as u64);
-        Ok(Self(Arc::new((mmap, ty))))
+    /// `maximum` number of 64K-sized pages. This call allocates the necessary
+    /// pages on the system.
+    pub fn new(engine: &Engine, ty: MemoryType) -> Result<Self> {
+        if !ty.is_shared() {
+            bail!("shared memory must have the `shared` flag enabled on its memory type")
+        }
+        debug_assert!(ty.maximum().is_some());
+
+        let tunables = &engine.config().tunables;
+        // TODO: check the tunables (only static allocation allowed)
+        let memory = wasmtime_runtime::SharedMemory::new(ty.wasmtime_memory().clone(), tunables)?;
+        Ok(Self(memory, engine.clone()))
+    }
+
+    /// Return a reference to the [`Engine`] used to configure the shared
+    /// memory.
+    pub fn engine(&self) -> &Engine {
+        &self.1
     }
 
     /// Return the type of the shared memory.
     pub fn ty(&self) -> MemoryType {
-        self.0.as_ref().1.clone()
+        MemoryType::from_wasmtime_memory(&self.0.ty())
     }
 
     /// Return read access to the available portion of the shared memory. Note
@@ -742,6 +757,12 @@ impl SharedMemory {
     /// that the available pages may be between `[minimum, maximum]`.
     pub fn data_mut(&self) -> &[u8] {
         todo!()
+    }
+}
+
+impl Into<wasmtime_runtime::SharedMemory> for SharedMemory {
+    fn into(self) -> wasmtime_runtime::SharedMemory {
+        self.0
     }
 }
 

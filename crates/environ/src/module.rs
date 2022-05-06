@@ -23,50 +23,11 @@ pub enum MemoryStyle {
         /// The number of mapped and unmapped pages.
         bound: u64,
     },
-    /// Address space is pre-allocated externally, e.g., with external shared
-    /// memory. This variant is not serializable since it contains a raw pointer
-    /// address.
-    #[serde(skip)]
-    External(ExternalMemory),
-}
-
-/// A description of a slice of external memory.
-#[derive(Debug, Clone, Hash)]
-pub struct ExternalMemory {
-    /// The slice address.
-    pub base: usize,
-    /// The length of the slice.
-    pub len: usize,
 }
 
 impl MemoryStyle {
     /// Decide on an implementation style for the given `Memory`.
-    pub fn for_memory(
-        memory: Memory,
-        tunables: &Tunables,
-        preallocation: Option<ExternalMemory>,
-    ) -> (Self, u64) {
-        // For shared memory, there are two cases:
-        //  - either we receive the memory allocated externally (see
-        //    `preallocation`)
-        //  - or we will pre-allocate all of the pages necessary to avoid ever
-        //    moving the shared memory during `grow` operations.
-        if memory.shared {
-            let bound = memory.maximum.expect(
-                "Wasm validation must guarantee that a shared memory must have an upper bound",
-            );
-            if let Some(preallocation) = preallocation {
-                assert_eq!(bound * WASM_PAGE_SIZE as u64, preallocation.len as u64);
-                return (Self::External(preallocation), 0);
-            } else {
-                assert!(bound <= tunables.static_memory_bound);
-                return (
-                    Self::Static { bound },
-                    tunables.static_memory_offset_guard_size,
-                );
-            }
-        }
-
+    pub fn for_memory(memory: Memory, tunables: &Tunables) -> (Self, u64) {
         // A heap with a maximum that doesn't exceed the static memory bound specified by the
         // tunables make it static.
         //
@@ -123,12 +84,8 @@ pub struct MemoryPlan {
 
 impl MemoryPlan {
     /// Draw up a plan for implementing a `Memory`.
-    pub fn for_memory(
-        memory: Memory,
-        tunables: &Tunables,
-        preallocation: Option<ExternalMemory>,
-    ) -> Self {
-        let (style, offset_guard_size) = MemoryStyle::for_memory(memory, tunables, preallocation);
+    pub fn for_memory(memory: Memory, tunables: &Tunables) -> Self {
+        let (style, offset_guard_size) = MemoryStyle::for_memory(memory, tunables);
         Self {
             memory,
             style,

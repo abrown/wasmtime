@@ -306,7 +306,7 @@ impl<'data> ModuleEnvironment<'data> {
                     if memory.shared && !self.features.threads {
                         return Err(WasmError::Unsupported("shared memories".to_owned()));
                     }
-                    let plan = MemoryPlan::for_memory(memory.into(), &self.tunables, None);
+                    let plan = MemoryPlan::for_memory(memory.into(), &self.tunables);
                     self.result.module.memory_plans.push(plan);
                 }
             }
@@ -741,7 +741,7 @@ and for re-adding support for interface types you can see this issue:
                 EntityIndex::Table(self.result.module.table_plans.push(plan))
             }
             EntityType::Memory(ty) => {
-                let plan = MemoryPlan::for_memory(ty, &self.tunables, None);
+                let plan = MemoryPlan::for_memory(ty, &self.tunables);
                 EntityIndex::Memory(self.result.module.memory_plans.push(plan))
             }
             EntityType::Global(ty) => EntityIndex::Global(self.result.module.globals.push(ty)),
