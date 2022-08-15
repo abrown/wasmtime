@@ -60,6 +60,10 @@ pub const SUPPORTED_WASI_MODULES: &[(&str, &str)] = &[
         "experimental-wasi-crypto",
         "enables support for the WASI cryptography APIs (experimental), see https://github.com/WebAssembly/wasi-crypto",
     ),
+    (
+        "experimental-wasi-parallel",
+        "enables support for the WASI parallel APIs (experimental)",
+    ),
 ];
 
 fn pick_profiling_strategy(jitdump: bool, vtune: bool) -> Result<ProfilingStrategy> {
@@ -470,6 +474,7 @@ fn parse_wasi_modules(modules: &str) -> Result<WasiModules> {
                 "wasi-common" => Ok(wasi_modules.wasi_common = enable),
                 "experimental-wasi-nn" => Ok(wasi_modules.wasi_nn = enable),
                 "experimental-wasi-crypto" => Ok(wasi_modules.wasi_crypto = enable),
+                "experimental-wasi-parallel" => Ok(wasi_modules.wasi_parallel = enable),
                 "default" => bail!("'default' cannot be specified with other WASI modules"),
                 _ => bail!("unsupported WASI module '{}'", module),
             };
@@ -501,6 +506,9 @@ pub struct WasiModules {
 
     /// Enable the experimental wasi-crypto implementation.
     pub wasi_crypto: bool,
+
+    /// Enable the experimental wasi-parallel implementation.
+    pub wasi_parallel: bool,
 }
 
 impl Default for WasiModules {
@@ -509,6 +517,7 @@ impl Default for WasiModules {
             wasi_common: true,
             wasi_nn: false,
             wasi_crypto: false,
+            wasi_parallel: false,
         }
     }
 }
@@ -520,6 +529,7 @@ impl WasiModules {
             wasi_common: false,
             wasi_nn: false,
             wasi_crypto: false,
+            wasi_parallel: false,
         }
     }
 }
@@ -666,7 +676,8 @@ mod test {
             WasiModules {
                 wasi_common: true,
                 wasi_nn: false,
-                wasi_crypto: false
+                wasi_crypto: false,
+                wasi_parallel: false
             }
         );
     }
@@ -679,7 +690,8 @@ mod test {
             WasiModules {
                 wasi_common: true,
                 wasi_nn: false,
-                wasi_crypto: false
+                wasi_crypto: false,
+                wasi_parallel: false
             }
         );
     }
@@ -696,7 +708,8 @@ mod test {
             WasiModules {
                 wasi_common: false,
                 wasi_nn: true,
-                wasi_crypto: false
+                wasi_crypto: false,
+                wasi_parallel: false
             }
         );
     }
@@ -710,7 +723,8 @@ mod test {
             WasiModules {
                 wasi_common: false,
                 wasi_nn: false,
-                wasi_crypto: false
+                wasi_crypto: false,
+                wasi_parallel: false
             }
         );
     }
