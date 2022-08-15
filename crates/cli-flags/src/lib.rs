@@ -255,7 +255,7 @@ impl CommonOptions {
             let prefix = "wasmtime.dbg.";
             init_file_per_thread_logger(prefix);
         } else {
-            pretty_env_logger::init();
+            let _ = pretty_env_logger::try_init();
         }
     }
 

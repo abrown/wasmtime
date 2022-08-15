@@ -3,14 +3,13 @@
 //! device was returned.
 
 use crate::device::{discover, Buffer, Device};
-use crate::witx::types::{Buffer, BufferAccessKind, DeviceKind};
-use crate::KernelSection;
+use crate::witx::types::{BufferAccessKind, DeviceKind};
 use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
-use log::{info, warn};
+use log::info;
 use rand::Rng;
 use std::collections::HashMap;
-use wasmtime::Val;
+use wasmtime::SharedMemory;
 
 #[derive(Debug)]
 pub struct WasiParallelContext {
@@ -21,46 +20,19 @@ pub struct WasiParallelContext {
 }
 
 impl WasiParallelContext {
-    pub fn new(sections: Vec<KernelSection>) -> Self {
+    pub fn new() -> Self {
         // Perform some rudimentary device discovery.
         let mut devices = IndexMap::new();
         for device in discover() {
             devices.insert(Self::random_id(), device);
         }
 
-        let mut context = Self {
+        Self {
             spirv: HashMap::new(),
             devices,
             buffers: HashMap::new(),
             device_for_buffers: HashMap::new(),
-        };
-
-        // Insert any SPIR-V found as custom sections to the Wasm binary.
-        for section in sections {
-            context.insert_spirv(section.0 as i32, section.1)
         }
-
-        context
-    }
-
-    /// Insert a SPIR-V section for a given function index. Note that this is
-    /// only necessary for the current "fat binary" mechanism--this could change
-    /// in the future (TODO).
-    pub fn insert_spirv(&mut self, index: i32, bytes: Vec<u8>) {
-        if self.spirv.contains_key(&index) {
-            warn!(
-                "context already contains SPIR-V for function index: {}",
-                index
-            );
-        }
-        self.spirv.insert(index, bytes);
-    }
-
-    /// Retrieve a SPIR-V section for a given function index. Note that this is
-    /// only necessary for implementing the current "fat binary" mechanism--this
-    /// could change in the future (TODO).
-    pub fn get_spirv(&self, index: i32) -> Option<&Vec<u8>> {
-        self.spirv.get(&index)
     }
 
     /// Retrieve a device based on a hint, using the default device if the hint
@@ -133,6 +105,8 @@ impl WasiParallelContext {
     pub fn invoke_parallel_for(
         &mut self,
         kernel: &[u8],
+        engine: &wasmtime::Engine,
+        shared_memory: SharedMemory,
         num_threads: i32,
         block_size: i32,
         in_buffers: &[i32],
@@ -176,13 +150,13 @@ impl WasiParallelContext {
         let device = device.unwrap_or(self.get_default_device()?);
 
         // Check that the device is valid.
-        if let Some(device) = self.devices.get(&device) {
+        if let Some(device) = self.devices.get_mut(&device) {
             info!(
                 "Calling invoke_for on {:?} with number of threads = {}, block_size = {}",
                 device, num_threads, block_size
             );
-            device.invoke_for(
-                Kernel(kernel.to_owned()),
+            device.parallelize(
+                Kernel::new(kernel.to_owned(), engine.clone(), shared_memory),
                 num_threads,
                 block_size,
                 in_buffers_,
@@ -200,10 +174,31 @@ impl WasiParallelContext {
     }
 }
 
-// We pass around a closure here because we want to close over Caller instead of
-// threading it throughout the context. The closure must be `Fn` so we can send
-// it to a thread pool more than once; the `Send + Sync` are necessary for the
-// same reason.
-pub(crate) type WasmRunnable = Box<dyn Fn(&[Val]) -> Result<Box<[Val]>> + Send + Sync>;
-
-pub struct Kernel(Vec<u8>);
+/// A binary-encoded WebAssembly module containing the function to be run in
+/// parallel. The engine is included so that the WebAssembly code can be
+/// JIT-compiled with the same configuration as the currently-running
+/// WebAssembly.
+pub struct Kernel {
+    module: Vec<u8>,
+    engine: wasmtime::Engine,
+    memory: SharedMemory,
+}
+impl Kernel {
+    pub const NAME: &'static str = "kernel";
+    pub fn new(module: Vec<u8>, engine: wasmtime::Engine, memory: SharedMemory) -> Self {
+        Self {
+            module,
+            engine,
+            memory,
+        }
+    }
+    pub fn module(&self) -> &[u8] {
+        &self.module
+    }
+    pub fn engine(&self) -> &wasmtime::Engine {
+        &self.engine
+    }
+    pub fn memory(&self) -> &SharedMemory {
+        &self.memory
+    }
+}

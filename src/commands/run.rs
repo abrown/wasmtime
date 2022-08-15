@@ -527,15 +527,7 @@ fn populate_with_wasi(
             wasmtime_wasi_parallel::add_to_linker(linker, |host| {
                 host.wasi_parallel.as_mut().unwrap()
             })?;
-            let module_bytes = std::fs::read(module_path)?;
-            let spirv_sections = if let Ok(sections) =
-                wasmtime_wasi_parallel::find_custom_spirv_sections(&module_bytes)
-            {
-                sections
-            } else {
-                Vec::new()
-            };
-            store.data_mut().wasi_parallel = Some(WasiParallel::new(spirv_sections));
+            store.data_mut().wasi_parallel = Some(WasiParallel::new());
         }
     }
 

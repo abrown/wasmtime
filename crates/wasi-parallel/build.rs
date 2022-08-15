@@ -1,6 +1,8 @@
 //! This build script:
 //!  - has the configuration necessary for the wiggle and witx macros
 //!  - generates Wasm from the files in `tests/rust` to `tests/wasm`
+
+#[cfg(feature = "rebuild-tests")]
 use std::{
     env,
     fs::DirBuilder,
@@ -21,10 +23,14 @@ fn main() {
 
     println!("cargo:rerun-if-changed=tests/cpp/wasi_parallel.h");
 
-    //build_wasm("tests");
-    //build_wasm("benches");
+    #[cfg(feature = "selinux-fix")]
+    {
+        build_wasm("tests");
+        build_wasm("benches");
+    }
 }
 
+#[cfg(feature = "rebuild-tests")]
 fn build_wasm<P: AsRef<Path>>(root: P) {
     let root_dir = Path::new(root.as_ref().as_os_str());
     let wasm_dir = root_dir.join("wasm");
@@ -84,6 +90,7 @@ fn build_wasm<P: AsRef<Path>>(root: P) {
 
 /// Use rustc to compile a Rust file to a Wasm file that uses the wasi-parallel
 /// API.
+#[cfg(feature = "rebuild-tests")]
 fn compile_rust<P1: AsRef<Path>, P2: AsRef<Path>>(source_file: P1, destination_dir: P2) {
     let stem = source_file.as_ref().file_stem().unwrap();
     let mut destination_file: PathBuf = [destination_dir.as_ref().as_os_str(), stem]
@@ -110,6 +117,7 @@ fn compile_rust<P1: AsRef<Path>, P2: AsRef<Path>>(source_file: P1, destination_d
     )
 }
 
+#[cfg(feature = "rebuild-tests")]
 fn compile_cpp<P1: AsRef<Path>, P2: AsRef<Path>>(source_file: P1, destination_dir: P2) -> PathBuf {
     let stem = source_file.as_ref().file_stem().unwrap();
     let mut destination_file: PathBuf = [destination_dir.as_ref().as_os_str(), stem]
