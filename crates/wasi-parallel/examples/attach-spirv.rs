@@ -10,14 +10,14 @@
 //! See the `cli.rs` tests also.
 
 use anyhow::Result;
+use clap::{AppSettings, Parser};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
-use structopt::{clap::AppSettings, StructOpt};
-use wasm_encoder::{CustomSection, Section};
+use wasm_encoder::{CustomSection, Encode, Section};
 
 /// Attach a custom section to a Wasm module.
-#[derive(StructOpt)]
+#[derive(Parser)]
 #[structopt(
     name = "attach-spirv",
     version = env!("CARGO_PKG_VERSION"),

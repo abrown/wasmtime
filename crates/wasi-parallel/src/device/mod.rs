@@ -24,7 +24,7 @@ pub fn discover() -> Vec<Box<dyn Device>> {
 }
 
 /// Define the operations possible on a device.
-pub trait Device: Send + Sync {
+pub trait Device {
     /// Return the device kind.
     fn kind(&self) -> DeviceKind;
 
@@ -36,9 +36,9 @@ pub trait Device: Send + Sync {
     /// the correct devices.
     fn create_buffer(&self, size: i32, access: BufferAccessKind) -> Box<dyn Buffer>;
 
-    /// Invoke a parallel for on the device.
-    fn invoke_for(
-        &self,
+    /// Invoke a parallel "for" on the device.
+    fn parallelize(
+        &mut self,
         kernel: Kernel,
         num_threads: i32,
         block_size: i32,

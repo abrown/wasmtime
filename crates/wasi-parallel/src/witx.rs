@@ -3,10 +3,12 @@
 use crate::{WasiParallel, WasiParallelError};
 
 // Generate the traits and types of wasi-parallel to several Rust modules (e.g.
-// `types`).
+// `types`). TODO: eventually re-add Git submodule for auto-retrieval of the
+// specification.
 wiggle::from_witx!({
-    witx: ["$WASI_ROOT/phases/ephemeral/witx/wasi_ephemeral_parallel.witx"],
+    witx: ["$WASI_ROOT/wasi_ephemeral_parallel.witx"],
     errors: { par_errno => WasiParallelError },
+    skip: ["parallel_for"],
 });
 
 use types::ParErrno;
