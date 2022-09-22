@@ -1,4 +1,7 @@
-//! Implement wasi-parallel.
+//! Implement [`wasi-parallel`].
+//!
+//! [`wasi-parallel`]: https://github.com/WebAssembly/wasi-parallel
+
 mod context;
 mod device;
 mod r#impl;
@@ -41,7 +44,7 @@ pub fn add_to_linker<T>(
     // `wiggle_generate::wasmtime::generate_func`.
     linker.func_wrap(
         "wasi_ephemeral_parallel",
-        "parallel_for",
+        "parallel_exec",
         move |mut caller: Caller<'_, T>,
               arg0: i32,
               arg1: i32,
@@ -50,7 +53,8 @@ pub fn add_to_linker<T>(
               arg4: i32,
               arg5: i32,
               arg6: i32,
-              arg7: i32|
+              arg7: i32,
+              arg8: i32|
               -> Result<i32, Trap> {
             // A module using wasi-parallel must export a shared memory named
             // 'memory'. This is what is passed to Wiggle.
@@ -67,11 +71,12 @@ pub fn add_to_linker<T>(
             // directly in wiggle-generated code but our need for `Caller`
             // forces us to do it here. Changes from the auto-generated
             // are marked with TODOs.
-            let kernel = wiggle::GuestPtr::<[u8]>::new(&mem, (arg0 as u32, arg1 as u32));
-            let num_threads = arg2; // TODO: as u32
-            let block_size = arg3; // TODO: as u32
-            let in_buffers = wiggle::GuestPtr::<[i32]>::new(&mem, (arg4 as u32, arg5 as u32)); // TODO ...<[Buffer]>
-            let out_buffers = wiggle::GuestPtr::<[i32]>::new(&mem, (arg6 as u32, arg7 as u32)); // TODO: ...<[Buffer]>
+            let device_id = arg0;
+            let kernel = wiggle::GuestPtr::<[u8]>::new(&mem, (arg1 as u32, arg2 as u32));
+            let num_threads = arg3; // TODO: as u32
+            let block_size = arg4; // TODO: as u32
+            let in_buffers = wiggle::GuestPtr::<[i32]>::new(&mem, (arg5 as u32, arg6 as u32)); // TODO ...<[Buffer]>
+            let out_buffers = wiggle::GuestPtr::<[i32]>::new(&mem, (arg7 as u32, arg8 as u32)); // TODO: ...<[Buffer]>
 
             // To properly compile the function we need to use the same engine
             // as the caller.
@@ -84,6 +89,7 @@ pub fn add_to_linker<T>(
             let in_buffers = &*in_buffers.as_slice().map_err(stringify_wiggle_err)?;
             let out_buffers = &*out_buffers.as_slice().map_err(stringify_wiggle_err)?;
             let result = inner_ctx.invoke_parallel_for(
+                device_id,
                 kernel,
                 engine,
                 shared_memory,

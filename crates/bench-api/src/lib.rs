@@ -459,6 +459,9 @@ impl BenchState {
         #[cfg(feature = "wasi-crypto")]
         wasmtime_wasi_crypto::add_to_linker(&mut linker, |cx| &mut cx.wasi_crypto)?;
 
+        #[cfg(feature = "wasi-parallel")]
+        wasmtime_wasi_parallel::add_to_linker(&mut linker, |cx| &mut cx.wasi_parallel)?;
+
         Ok(Self {
             linker,
             compilation_timer,

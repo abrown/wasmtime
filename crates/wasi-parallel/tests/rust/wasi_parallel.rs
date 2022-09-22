@@ -1,7 +1,9 @@
-//! This module provices Rust bindings to the wasi-parallel API as implemented in
-//! this crate. It was generated at https://alexcrichton.github.io/witx-bindgen
-//! using the WITX below and altered slightly since Wiggle's generated signatures
-//! are slightly different than witx-bindgen's:
+//! This module provides Rust bindings to the wasi-parallel API as implemented
+//! in this crate. It was generated at
+//! https://alexcrichton.github.io/witx-bindgen using the WITX below and altered
+//! slightly since Wiggle's generated signatures are slightly different than
+//! witx-bindgen's:
+//!
 //! ```
 //! resource Device
 //! enum DeviceKind {
@@ -22,7 +24,7 @@
 //! create_buffer: function(device: Device, size: u32, buffer_access_kind: BufferAccessKind) -> expected<Buffer, ParErrno>
 //! write_buffer: function(source: list<u8>, destination: Buffer) -> expected<_, ParErrno>
 //! read_buffer: function(source: Buffer, destination: list<u8>) -> expected<_, ParErrno>
-//! parallel_for: function(kernel: u32, num_threads: u32, block_size: u32, in_buffers: list<Buffer>, out_buffers: list<Buffer>) -> expected<_, ParErrno>
+//! parallel_for: function(device: Device, kernel: list<u8>, num_iterations: u32, block_size: u32, in_buffers: list<Buffer>, out_buffers: list<Buffer>) -> expected<_, ParErrno>
 //! ```
 
 #[repr(u8)]

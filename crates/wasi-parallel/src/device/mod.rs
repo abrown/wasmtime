@@ -1,14 +1,11 @@
 pub mod cpu;
-pub mod cpu_single_threaded;
+pub mod sequential;
 pub mod wasm_memory_buffer;
-
-#[cfg(feature = "opencl")]
-mod opencl;
 
 use crate::witx::types::{BufferAccessKind, DeviceKind};
 use crate::{
     context::Kernel,
-    device::{cpu::CpuDevice, cpu_single_threaded::CpuSingleThreadedDevice},
+    device::{cpu::CpuDevice, sequential::SequentialDevice},
 };
 use anyhow::Result;
 use std::{any::Any, fmt::Debug};
@@ -16,11 +13,7 @@ use wiggle::GuestPtr;
 
 /// Discover available devices.
 pub fn discover() -> Vec<Box<dyn Device>> {
-    #[allow(unused_mut)]
-    let mut devices = vec![CpuDevice::new(), CpuSingleThreadedDevice::new()];
-    #[cfg(feature = "opencl")]
-    devices.append(&mut opencl::discover());
-    devices
+    vec![CpuDevice::new(), SequentialDevice::new()]
 }
 
 /// Define the operations possible on a device.

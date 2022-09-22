@@ -1,6 +1,7 @@
 //! This test checks that wasi-parallel's `read_buffer`/`write_buffer` work as
-//! expected on a CPU. This is intended to be compiled to Wasm by `build.rs`; to
-//! run it directly:
+//! expected on a CPU. This is intended to be compiled to Wasm by `build.rs`,
+//! but to run it directly:
+//!
 //! ```
 //! rustc tests/rust/buffer.rs --target wasm32-wasi
 //! RUST_BACKTRACE=1 wasmtime run --wasi-modules=experimental-wasi-parallel ./buffer.wasm

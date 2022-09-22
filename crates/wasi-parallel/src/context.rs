@@ -1,12 +1,12 @@
-//! This module implements the state held by wasi-parallel. E.g., when
-//! wasi-parallel returns a handle to a device, it must keep a mapping of which
-//! device was returned.
+//! This module implements the state held by `wasi-parallel`. E.g., when
+//! `wasi-parallel` returns a handle to a device, it must maintain a mapping of
+//! which device was returned. The `WasiParallelContext` proxies on calls to the
+//! correct parallel device.
 
 use crate::device::{discover, Buffer, Device};
 use crate::witx::types::{BufferAccessKind, DeviceKind};
 use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
-use log::info;
 use rand::Rng;
 use std::collections::HashMap;
 use wasmtime::SharedMemory;
@@ -104,6 +104,7 @@ impl WasiParallelContext {
     /// and output buffers.
     pub fn invoke_parallel_for(
         &mut self,
+        device_id: i32,
         kernel: &[u8],
         engine: &wasmtime::Engine,
         shared_memory: SharedMemory,
@@ -130,30 +131,23 @@ impl WasiParallelContext {
             }
         }
 
-        // Check that all buffers have the same device.
-        let mut device = None;
-        for dev in in_buffers
+        // Check that all buffers are assigned to the right device.
+        if !in_buffers
             .iter()
             .chain(out_buffers.iter())
             .map(|b| *self.device_for_buffers.get(b).unwrap())
+            .all(|d| d == device_id)
         {
-            if let Some(device) = device {
-                if device != dev {
-                    return Err(anyhow!("buffers are assigned to different devices"));
-                }
-            } else {
-                device = Some(dev)
-            }
+            return Err(anyhow!("buffers are assigned to different devices"));
         }
 
-        // If no device is found, use the default one.
-        let device = device.unwrap_or(self.get_default_device()?);
-
         // Check that the device is valid.
-        if let Some(device) = self.devices.get_mut(&device) {
-            info!(
-                "Calling invoke_for on {:?} with number of threads = {}, block_size = {}",
-                device, num_threads, block_size
+        if let Some(device) = self.devices.get_mut(&device_id) {
+            log::debug!(
+                "starting parallel iterations = {}, block_size = {}, device = {:?}",
+                num_threads,
+                block_size,
+                device
             );
             device.parallelize(
                 Kernel::new(kernel.to_owned(), engine.clone(), shared_memory),

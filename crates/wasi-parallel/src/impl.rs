@@ -4,6 +4,7 @@
 //! `from_witx!` in `witx.rs` but the special nature of `parallel_for` (it can
 //! call back into a function in the Wasm module) involves a manual
 //! implementation of this glue code.
+
 use crate::witx::types::{
     Buffer, BufferAccessKind, BufferData, BufferSize, DeviceKind, ParallelDevice,
 };
@@ -27,8 +28,6 @@ impl WasiEphemeralParallel for WasiParallel {
             .borrow_mut()
             .create_buffer(device.into(), size as i32, kind)?;
         Ok(Buffer::from(id))
-        // TODO change type to `u32`: parameters `device_d` and `size`, returned
-        // buffer ID
     }
 
     fn write_buffer<'a>(
@@ -52,5 +51,5 @@ impl WasiEphemeralParallel for WasiParallel {
         buffer.read(*data)
     }
 
-    // Note: `parallel_for` is manually linked in `lib.rs`.
+    // Note: `parallel_exec` is manually linked in `lib.rs`.
 }

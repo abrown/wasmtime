@@ -1,9 +1,10 @@
 //! Contains a reference to a slice of Wasm memory.
-use std::any::Any;
-
+//!
 use super::Buffer;
 use crate::witx::types::BufferAccessKind;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use std::{any::Any, convert::TryInto, vec};
+use wasmtime::Val;
 use wiggle::GuestPtr;
 
 /// This kind of buffer is designed to live exclusively in Wasm memory--it
@@ -14,12 +15,13 @@ use wiggle::GuestPtr;
 ///   only its length.
 /// - The buffer may then be written to by `write_buffer`; at this point the
 ///   buffer will record the its offset within the Wasm memory.
-/// - When used by `for`, this buffer will simply pass its offset and length to
-///   the parallel kernel, where it will be mutated by a Wasm function.
+/// - When used by `parallel_exec`, this buffer will simply pass its offset and
+///   length to the parallel kernel, where it will be mutated by a Wasm
+///   function.
 /// - The buffer contents may "read" from one section of the Wasm memory to
 ///   another.
 pub struct WasmMemoryBuffer {
-    pub(crate) offset: Option<u32>,
+    offset: Option<u32>,
     length: u32,
     access: BufferAccessKind,
 }
@@ -83,15 +85,80 @@ impl Buffer for WasmMemoryBuffer {
     }
 }
 
-/// This helper copies one sublice to another within a mutable slice. It will
-/// panic if the slices are overlapping. See
-/// https://stackoverflow.com/a/45082624.
+/// This helper copies one sub-slice to another within a mutable slice. It will
+/// panic if the slices are overlapping.
 fn copy_within_a_slice<T: Clone>(v: &mut [T], from: usize, to: usize, len: usize) {
-    if from > to {
+    if from == to {
+        // Do nothing.
+    } else if from > to {
         let (dst, src) = v.split_at_mut(from);
         dst[to..to + len].clone_from_slice(&src[..len]);
     } else {
         let (src, dst) = v.split_at_mut(to);
         dst[..len].clone_from_slice(&src[from..from + len]);
+    }
+}
+
+/// Convert an iterator of [`WasmMemoryBuffer`] into their corresponding
+/// WebAssembly pointer address and length.
+pub fn as_pointer_and_length<'a, I>(buffers: I) -> Result<Vec<Val>>
+where
+    I: Iterator<Item = &'a Box<dyn Buffer>>,
+{
+    let mut results = vec![];
+    for b in buffers {
+        if let Some(b_) = b.as_any().downcast_ref::<WasmMemoryBuffer>() {
+            let len = b
+                .len()
+                .try_into()
+                .context("the buffer length is too large for an i32")?;
+            if let Some(offset) = b_.offset {
+                results.push(Val::I32(offset.try_into().unwrap()));
+                results.push(Val::I32(len));
+            } else {
+                bail!("the buffer has not been written to: {:?}", b);
+                // TODO there must be a way to set up the buffer without writing
+                // to it; e.g., for write buffers that only the device touches.
+            }
+        } else {
+            bail!("the buffer is invalid; any buffer used by the CPU should be castable to a pointer + length");
+        }
+    }
+    Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn copy_before() {
+        let mut buffer = [0u8; 1024];
+        buffer[42] = 42;
+        copy_within_a_slice(&mut buffer, 42, 41, 1);
+        assert_eq!(buffer[41], 42);
+    }
+
+    #[test]
+    fn copy_same_location() {
+        let mut buffer = [0u8; 1024];
+        buffer[42] = 42;
+        copy_within_a_slice(&mut buffer, 42, 42, 1);
+        assert_eq!(buffer[42], 42);
+    }
+
+    #[test]
+    fn copy_after() {
+        let mut buffer = [0u8; 1024];
+        buffer[42] = 42;
+        copy_within_a_slice(&mut buffer, 42, 43, 1);
+        assert_eq!(buffer[43], 42);
+    }
+
+    #[test]
+    #[should_panic]
+    fn copy_overlapping() {
+        let mut buffer = [0u8; 1024];
+        copy_within_a_slice(&mut buffer, 42, 43, 2);
     }
 }

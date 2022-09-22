@@ -1,4 +1,4 @@
-//! Contains the macro-generated implementation of wasi-nn from the its WITX
+//! Contains the macro-generated implementation of wasi-nn from its WITX
 //! definition file.
 use crate::{WasiParallel, WasiParallelError};
 
@@ -8,7 +8,7 @@ use crate::{WasiParallel, WasiParallelError};
 wiggle::from_witx!({
     witx: ["$WASI_ROOT/wasi_ephemeral_parallel.witx"],
     errors: { par_errno => WasiParallelError },
-    skip: ["parallel_for"],
+    skip: ["parallel_exec"],
 });
 
 use types::ParErrno;
@@ -26,8 +26,8 @@ impl wiggle::GuestErrorType for ParErrno {
 impl wasi_ephemeral_parallel::UserErrorConversion for WasiParallel {
     fn par_errno_from_wasi_parallel_error(
         &mut self,
-        _e: anyhow::Error,
+        e: anyhow::Error,
     ) -> Result<crate::witx::types::ParErrno, wiggle::Trap> {
-        todo!()
+        todo!("must handle error: {}", e)
     }
 }
