@@ -6,7 +6,7 @@ use crate::{WasiParallel, WasiParallelError};
 // `types`). TODO: eventually re-add Git submodule for auto-retrieval of the
 // specification.
 wiggle::from_witx!({
-    witx: ["$WASI_ROOT/wasi_ephemeral_parallel.witx"],
+    witx: ["$WASI_ROOT/wasi-parallel.witx"],
     errors: { par_errno => WasiParallelError },
     skip: ["parallel_exec"],
 });
