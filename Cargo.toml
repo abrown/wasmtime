@@ -30,6 +30,7 @@ wasmtime-wast = { workspace = true }
 wasmtime-wasi = { workspace = true }
 wasmtime-wasi-crypto = { workspace = true, optional = true }
 wasmtime-wasi-nn = { workspace = true, optional = true }
+wasmtime-wasi-threads = { workspace = true, optional = true }
 clap = { workspace = true, features = ["color", "suggestions", "derive"] }
 anyhow = { workspace = true }
 target-lexicon = { workspace = true }
@@ -83,6 +84,7 @@ members = [
   "crates/bench-api",
   "crates/c-api",
   "crates/cli-flags",
+  "crates/wasi-threads",
   "crates/environ/fuzz",
   "crates/jit-icache-coherence",
   "examples/fib-debug/wasm",
@@ -115,6 +117,7 @@ wasmtime-wast = { path = "crates/wast", version = "=3.0.0" }
 wasmtime-wasi = { path = "crates/wasi", version = "3.0.0" }
 wasmtime-wasi-crypto = { path = "crates/wasi-crypto", version = "3.0.0" }
 wasmtime-wasi-nn = { path = "crates/wasi-nn", version = "3.0.0" }
+wasmtime-wasi-threads = { path = "crates/wasi-threads", version = "3.0.0" }
 wasmtime-component-util = { path = "crates/component-util", version = "=3.0.0" }
 wasmtime-component-macro = { path = "crates/component-macro", version = "=3.0.0" }
 wasmtime-asm-macros = { path = "crates/asm-macros", version = "=3.0.0" }
@@ -173,7 +176,6 @@ default = [
   "wasmtime/wat",
   "wasmtime/parallel-compilation",
   "vtune",
-  "wasi-nn",
   "pooling-allocator",
   "memory-init-cow",
 ]
@@ -181,6 +183,7 @@ jitdump = ["wasmtime/jitdump"]
 vtune = ["wasmtime/vtune"]
 wasi-crypto = ["dep:wasmtime-wasi-crypto"]
 wasi-nn = ["dep:wasmtime-wasi-nn"]
+wasi-threads = ["dep:wasmtime-wasi-threads"]
 memory-init-cow = ["wasmtime/memory-init-cow", "wasmtime-cli-flags/memory-init-cow"]
 pooling-allocator = ["wasmtime/pooling-allocator", "wasmtime-cli-flags/pooling-allocator"]
 all-arch = ["wasmtime/all-arch"]
