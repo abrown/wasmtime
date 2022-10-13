@@ -2,12 +2,7 @@
 //!
 //! This crate implements the Wasmtime command line tools.
 
-#![deny(
-    missing_docs,
-    trivial_numeric_casts,
-    unused_extern_crates,
-    unstable_features
-)]
+#![deny(missing_docs, trivial_numeric_casts, unused_extern_crates)]
 #![warn(unused_import_braces)]
 #![cfg_attr(feature = "clippy", plugin(clippy(conf_file = "../clippy.toml")))]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::new_without_default))]
@@ -22,6 +17,7 @@
         clippy::use_self
     )
 )]
+#![feature(get_mut_unchecked)]
 
 use once_cell::sync::Lazy;
 use wasmtime_cli_flags::{SUPPORTED_WASI_MODULES, SUPPORTED_WASM_FEATURES};
