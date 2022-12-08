@@ -351,16 +351,12 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
         let f = self.table().get_file(u32::from(fd))?;
         let f = f.get_cap(FileCaps::WRITE)?;
 
-        let guest_slices: Vec<wiggle::GuestSlice<u8>> = ciovs
+        let guest_slices: Vec<Vec<u8>> = ciovs
             .iter()
             .map(|iov_ptr| {
                 let iov_ptr = iov_ptr?;
                 let iov: types::Ciovec = iov_ptr.read()?;
-                Ok(iov
-                    .buf
-                    .as_array(iov.buf_len)
-                    .as_slice()?
-                    .expect("cannot use with shared memories; see https://github.com/bytecodealliance/wasmtime/issues/5235 (TODO)"))
+                Ok(iov.buf.as_array(iov.buf_len).to_vec()?)
             })
             .collect::<Result<_, Error>>()?;
 
