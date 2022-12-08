@@ -60,6 +60,12 @@ impl<T: Clone + Send + 'static> WasiThreadsCtx<T> {
             // before exiting the thread. It may be necessary to handle failures
             // here somehow, e.g., so that `pthread_join` can be notified if the
             // user function traps for some reason (TODO).
+            log::trace!(
+                "spawned thread id = {}; calling start function `{}` with: {}",
+                wasi_thread_id,
+                WASI_ENTRY_POINT,
+                thread_start_arg
+            );
             match thread_entry_point.call(&mut store, (wasi_thread_id, thread_start_arg)) {
                 Ok(_) => {}
                 Err(trap) => panic!("{}", fail(trap.to_string())),
@@ -94,6 +100,7 @@ pub fn add_to_linker<T: Clone + Send + 'static>(
         "wasi",
         "thread_spawn",
         move |mut caller: Caller<'_, T>, start_arg: i32| -> i32 {
+            log::trace!("new thread requested via `wasi::thread_spawn` call");
             let ctx = get_cx(caller.data_mut());
             match ctx.spawn(start_arg) {
                 Ok(thread_id) => {
