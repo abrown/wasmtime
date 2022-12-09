@@ -15,6 +15,7 @@ edition.workspace = true
 anyhow = { workspace = true }
 log = { workspace = true }
 rand = "0.8"
+wasi-common = { workspace = true }
 wasmtime = { workspace = true }
 
 [badges]
