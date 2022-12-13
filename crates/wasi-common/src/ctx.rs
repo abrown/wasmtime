@@ -7,12 +7,12 @@ use crate::table::Table;
 use crate::Error;
 use cap_rand::RngCore;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub struct WasiCtx {
     pub args: StringArray,
     pub env: StringArray,
-    pub random: Box<dyn RngCore + Send + Sync>,
+    pub random: Mutex<Box<dyn RngCore + Send + Sync>>,
     pub clocks: WasiClocks,
     pub sched: Box<dyn WasiSched>,
     pub table: Table,
@@ -28,7 +28,7 @@ impl WasiCtx {
         let s = WasiCtx {
             args: StringArray::new(),
             env: StringArray::new(),
-            random,
+            random: Mutex::new(random),
             clocks,
             sched,
             table,

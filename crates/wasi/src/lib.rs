@@ -44,7 +44,7 @@ use wasmtime::Linker;
 
 pub fn add_to_linker<T, U>(
     linker: &mut Linker<T>,
-    get_cx: impl Fn(&mut T) -> &mut U + Send + Sync + Copy + 'static,
+    get_cx: impl Fn(&mut T) -> &U + Send + Sync + Copy + 'static,
 ) -> anyhow::Result<()>
     where U: Send
             + wasi_common::snapshots::preview_0::wasi_unstable::WasiUnstable
@@ -65,7 +65,8 @@ pub mod snapshots {
             // the `WASI_ROOT` env variable, which is set in wasi-common's `build.rs`.
             witx: ["$WASI_ROOT/phases/snapshot/witx/wasi_snapshot_preview1.witx"],
             errors: { errno => trappable Error },
-            $async_mode: *
+            $async_mode: *,
+            mutable: false,
         });
     }
     pub mod preview_0 {
