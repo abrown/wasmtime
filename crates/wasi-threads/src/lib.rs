@@ -15,21 +15,15 @@ const WASI_ENTRY_POINT: &str = "wasi_thread_start";
 pub struct WasiThreadsCtx<T> {
     module: Module,
     linker: Linker<T>,
-    host: T,
 }
 
 impl<T: Clone + Send + 'static> WasiThreadsCtx<T> {
-    pub fn new(module: Module, linker: Linker<T>, host: T) -> Self {
-        Self {
-            module,
-            linker,
-            host,
-        }
+    pub fn new(module: Module, linker: Linker<T>) -> Self {
+        Self { module, linker }
     }
 
-    pub fn spawn(&mut self, thread_start_arg: i32) -> Result<i32> {
+    pub fn spawn(&self, host: T, thread_start_arg: i32) -> Result<i32> {
         let module = self.module.clone();
-        let host = self.host.clone();
         let linker = self.linker.clone();
 
         // Start a Rust thread running a new instance of the current module.
@@ -104,15 +98,16 @@ fn random_thread_id() -> i32 {
 pub fn add_to_linker<T: Clone + Send + 'static>(
     linker: &mut wasmtime::Linker<T>,
     module: &Module,
-    get_cx: impl Fn(&mut T) -> &mut WasiThreadsCtx<T> + Send + Sync + Copy + 'static,
+    get_cx: impl Fn(&mut T) -> &WasiThreadsCtx<T> + Send + Sync + Copy + 'static,
 ) -> anyhow::Result<SharedMemory> {
     linker.func_wrap(
         "wasi",
         "thread_spawn",
         move |mut caller: Caller<'_, T>, start_arg: i32| -> i32 {
             log::trace!("new thread requested via `wasi::thread_spawn` call");
+            let host = caller.data().clone();
             let ctx = get_cx(caller.data_mut());
-            match ctx.spawn(start_arg) {
+            match ctx.spawn(host, start_arg) {
                 Ok(thread_id) => {
                     assert!(thread_id >= 0, "thread_id = {}", thread_id);
                     thread_id
