@@ -17,7 +17,6 @@
         clippy::use_self
     )
 )]
-#![feature(get_mut_unchecked)]
 
 use once_cell::sync::Lazy;
 use wasmtime_cli_flags::{SUPPORTED_WASI_MODULES, SUPPORTED_WASM_FEATURES};
