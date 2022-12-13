@@ -460,20 +460,6 @@ struct Host {
     #[cfg(feature = "wasi-threads")]
     wasi_threads: Option<WasiThreadsCtx<Arc<Host>>>,
 }
-impl Host {
-    /// This method provides an `unsafe` way to access the underlying host
-    /// implementation mutably from more than one place. Because both the store
-    /// and the wasi-threads context hold on to an `Arc<Host>` and the WASI
-    /// implementations expect to receive a `&mut` borrow of their context, we
-    /// must have some way to transmute to the right type. This is highly
-    /// `unsafe` since multiple WASI threads could mutate a context
-    /// concurrently. This unsafety can be resolved by, e.g., enforcing that all
-    /// WASI contexts hide their mutability with concurrent locks.
-    unsafe fn leak(self: &Arc<Self>) -> &'static mut Self {
-        let ptr = Arc::<Host>::as_ptr(self).cast_mut();
-        ptr.as_mut().unwrap()
-    }
-}
 
 /// Populates the given `Linker` with WASI APIs.
 fn populate_with_wasi(
@@ -488,10 +474,7 @@ fn populate_with_wasi(
     mut tcplisten: Vec<TcpListener>,
 ) -> Result<()> {
     if wasi_modules.wasi_common {
-        wasmtime_wasi::add_to_linker(linker, |host| {
-            // SAFETY: see comments on `Host::leak`.
-            unsafe { host.leak() }.wasi.as_mut().unwrap()
-        })?;
+        wasmtime_wasi::add_to_linker(linker, |host| host.wasi.as_ref().unwrap())?;
 
         let mut builder = WasiCtxBuilder::new();
         builder = builder.inherit_stdio().args(argv)?.envs(vars)?;
@@ -513,7 +496,7 @@ fn populate_with_wasi(
             builder = builder.preopened_dir(dir, name)?;
         }
 
-        Arc::<Host>::get_mut(host)
+        Arc::get_mut(host)
             .expect("there must be no other host references during setup")
             .wasi = Some(builder.build());
     }
@@ -526,10 +509,12 @@ fn populate_with_wasi(
         #[cfg(feature = "wasi-crypto")]
         {
             wasmtime_wasi_crypto::add_to_linker(linker, |host| {
-                // SAFETY: see comments on `Host::leak`.
-                unsafe { host.leak() }.wasi_crypto.as_mut().unwrap()
+                Arc::get_mut(host)
+                    .wasi_crypto
+                    .as_mut()
+                    .expect("wasi-crypto is not implemented with multi-threading support")
             })?;
-            Arc::<Host>::get_mut(host)
+            Arc::get_mut(host)
                 .expect("there must be no other host references during setup")
                 .wasi_crypto = Some(WasiCryptoCtx::new());
         }
@@ -543,10 +528,12 @@ fn populate_with_wasi(
         #[cfg(feature = "wasi-nn")]
         {
             wasmtime_wasi_nn::add_to_linker(linker, |host| {
-                // SAFETY: see comments on `Host::leak`.
-                unsafe { host.leak() }.wasi_nn.as_mut().unwrap()
+                Arc::get_mut(host)
+                    .wasi_nn
+                    .as_mut()
+                    .expect("wasi-nn is not implemented with multi-threading support")
             })?;
-            Arc::<Host>::get_mut(host)
+            Arc::get_mut(host)
                 .expect("there must be no other host references during setup")
                 .wasi_nn = Some(WasiNnCtx::new()?);
         }
@@ -560,29 +547,11 @@ fn populate_with_wasi(
         #[cfg(feature = "wasi-threads")]
         {
             wasmtime_wasi_threads::add_to_linker(linker, &module, |host| {
-                // SAFETY: see comments on `Host::leak`.
-                unsafe { host.leak() }.wasi_threads.as_mut().unwrap()
+                host.wasi_threads.as_ref().unwrap()
             })?;
-
-            // SAFETY: unlike the other WASI implementations, wasi-threads must
-            // not only assign itself into the host object, it must also keep a
-            // reference to that host object to use with spawned child threads.
-            // This leads to two conflicting expectations: 1) `Arc::get_mut`
-            // expects only one reference to be counted at the time it is called
-            // and 2) we must also instantiate a wasi-threads object, cloning
-            // the host and incrementing its refcount. To avoid this, we
-            // temporarily leak a pointer to the slot we will modify,
-            // `wasi_threads`, and immediately assign the constructed context to
-            // it. As long as the `wasi_threads` pointer is never used
-            // elsewhere, this is safe.
-            let wasi_threads = {
-                let host = Arc::<Host>::get_mut(host)
-                    .expect("there must be no other host references during setup");
-                std::ptr::addr_of_mut!(host.wasi_threads)
-            };
-            unsafe {
-                *wasi_threads = Some(WasiThreadsCtx::new(module, linker.clone(), host.clone()));
-            }
+            Arc::get_mut(host)
+                .expect("there must be no other host references during setup")
+                .wasi_threads = Some(WasiThreadsCtx::new(module, linker.clone()));
         }
     }
 
