@@ -512,6 +512,33 @@ impl<'a, T> GuestPtr<'a, [T]> {
         (0..self.len()).map(move |i| base.add(i))
     }
 
+    /// TODO
+    pub fn as_list(&self) -> Result<GuestList<'a, T>, GuestError>
+    where
+        T: GuestTypeTransparent<'a> + Copy + 'a,
+    {
+        match self.as_unsafe_slice_mut()?.shared_borrow() {
+            UnsafeBorrowResult::Ok(slice) => Ok(GuestList::Borrowed(slice)),
+            UnsafeBorrowResult::Shared(_) => Ok(GuestList::Copied(self.to_vec()?)),
+            UnsafeBorrowResult::Err(e) => Err(e),
+        }
+    }
+
+    /// TODO
+    pub fn as_list_mut(&self) -> Result<GuestListMut<'a, T>, GuestError>
+    where
+        T: GuestTypeTransparent<'a> + Copy + Default + 'a,
+    {
+        match self.as_unsafe_slice_mut()?.mut_borrow() {
+            UnsafeBorrowResult::Ok(slice) => Ok(GuestListMut::Borrowed(slice)),
+            UnsafeBorrowResult::Shared(_) => Ok(GuestListMut::Copied(
+                self.clone(),
+                vec![T::default(); self.len() as usize],
+            )),
+            UnsafeBorrowResult::Err(e) => Err(e),
+        }
+    }
+
     /// Attempts to create a [`GuestSlice<'_, T>`] from this pointer, performing
     /// bounds checks and type validation. The `GuestSlice` is a smart pointer
     /// that can be used as a `&[T]` via the `Deref` trait. The region of memory
@@ -614,39 +641,7 @@ impl<'a, T> GuestPtr<'a, [T]> {
     where
         T: GuestTypeTransparent<'a> + Copy + 'a,
     {
-        // Retrieve the slice of memory to copy to, performing the necessary
-        // bounds checks ...
-        let guest_slice = self.as_unsafe_slice_mut()?;
-        // ... length check ...
-        if guest_slice.ptr.len() != slice.len() {
-            return Err(GuestError::SliceLengthsDiffer);
-        }
-        if slice.len() == 0 {
-            return Ok(());
-        }
-
-        // ... and copy the bytes.
-        match guest_slice.mut_borrow() {
-            UnsafeBorrowResult::Ok(mut dst) => dst.copy_from_slice(slice),
-            UnsafeBorrowResult::Shared(guest_slice) => {
-                // SAFETY: in the shared memory case, we copy and accept that
-                // the guest data may be concurrently modified. TODO: audit that
-                // this use of `std::ptr::copy` is safe with shared memory
-                // (https://github.com/bytecodealliance/wasmtime/issues/4203)
-                //
-                // Also note that the validity of `guest_slice` has already been
-                // determined by the `as_unsafe_slice_mut` call above.
-                unsafe {
-                    std::ptr::copy(
-                        slice.as_ptr(),
-                        guest_slice.ptr[0].get(),
-                        guest_slice.ptr.len(),
-                    )
-                };
-            }
-            UnsafeBorrowResult::Err(e) => return Err(e),
-        }
-        Ok(())
+        self.as_unsafe_slice_mut()?.copy_from_slice(slice)
     }
 
     /// Returns a `GuestPtr` pointing to the base of the array for the interior
@@ -772,6 +767,60 @@ impl<T: ?Sized + Pointee> fmt::Debug for GuestPtr<'_, T> {
     }
 }
 
+/// An abstract
+pub enum GuestList<'a, T> {
+    Borrowed(GuestSlice<'a, T>),
+    Copied(Vec<T>),
+}
+
+impl<'a, T> std::ops::Deref for GuestList<'a, T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            GuestList::Borrowed(s) => s,
+            GuestList::Copied(s) => s,
+        }
+    }
+}
+
+pub enum GuestListMut<'a, T> {
+    Borrowed(GuestSliceMut<'a, T>),
+    Copied(GuestPtr<'a, [T]>, Vec<T>),
+}
+impl<'a, T> GuestListMut<'a, T> {
+    // TODO
+    pub fn write_back(&self) -> Result<(), GuestError>
+    where
+        T: GuestTypeTransparent<'a> + Copy + 'a,
+    {
+        match self {
+            GuestListMut::Borrowed(_) => Ok(()),
+            GuestListMut::Copied(p, s) => p.copy_from_slice(&s),
+        }
+    }
+}
+
+impl<'a, T> std::ops::Deref for GuestListMut<'a, T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            GuestListMut::Borrowed(s) => s,
+            GuestListMut::Copied(_, s) => s,
+        }
+    }
+}
+
+impl<'a, T> std::ops::DerefMut for GuestListMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            GuestListMut::Borrowed(s) => s,
+            GuestListMut::Copied(_, s) => s,
+        }
+    }
+}
+
 /// A smart pointer to an shareable slice in guest memory.
 ///
 /// Usable as a `&'a [T]` via [`std::ops::Deref`].
@@ -868,7 +917,69 @@ pub struct UnsafeGuestSlice<'a, T> {
     mem: &'a dyn GuestMemory,
 }
 
+unsafe impl<T: Sync> Sync for UnsafeGuestSlice<'_, T> {}
+unsafe impl<T: Send> Send for UnsafeGuestSlice<'_, T> {}
+
 impl<'a, T> UnsafeGuestSlice<'a, T> {
+    /// See `GuestPtr::copy_from_slice`.
+    pub fn copy_from_slice(self, slice: &[T]) -> Result<(), GuestError>
+    where
+        T: GuestTypeTransparent<'a> + Copy + 'a,
+    {
+        // Check the length...
+        if self.ptr.len() != slice.len() {
+            return Err(GuestError::SliceLengthsDiffer);
+        }
+        if slice.len() == 0 {
+            return Ok(());
+        }
+
+        // ... and copy the bytes.
+        match self.mut_borrow() {
+            UnsafeBorrowResult::Ok(mut dst) => dst.copy_from_slice(slice),
+            UnsafeBorrowResult::Shared(guest_slice) => {
+                // SAFETY: in the shared memory case, we copy and accept that
+                // the guest data may be concurrently modified. TODO: audit that
+                // this use of `std::ptr::copy` is safe with shared memory
+                // (https://github.com/bytecodealliance/wasmtime/issues/4203)
+                //
+                // Also note that the validity of `guest_slice` has already been
+                // determined by the `as_unsafe_slice_mut` call above.
+                unsafe {
+                    std::ptr::copy(
+                        slice.as_ptr(),
+                        guest_slice.ptr[0].get(),
+                        guest_slice.ptr.len(),
+                    )
+                };
+            }
+            UnsafeBorrowResult::Err(e) => return Err(e),
+        }
+        Ok(())
+    }
+
+    /// Return the number of items in this slice.
+    pub fn len(&self) -> usize {
+        self.ptr.len()
+    }
+
+    /// Check if this slice comes from WebAssembly shared memory.
+    pub fn is_shared_memory(&self) -> bool {
+        self.mem.is_shared_memory()
+    }
+
+    /// See `GuestPtr::as_slice_mut`.
+    pub fn as_slice_mut(self) -> Result<Option<GuestSliceMut<'a, T>>, GuestError>
+    where
+        T: GuestTypeTransparent<'a>,
+    {
+        match self.mut_borrow() {
+            UnsafeBorrowResult::Ok(slice) => Ok(Some(slice)),
+            UnsafeBorrowResult::Shared(_) => Ok(None),
+            UnsafeBorrowResult::Err(e) => Err(e),
+        }
+    }
+
     /// Transform an `unsafe` guest slice to a [`GuestSliceMut`].
     ///
     /// # Safety
