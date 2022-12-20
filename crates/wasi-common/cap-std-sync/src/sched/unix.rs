@@ -14,6 +14,7 @@ pub async fn poll_oneoff<'a>(poll: &mut Poll<'a>) -> Result<(), Error> {
             Subscription::Read(f) => {
                 let fd = f
                     .file
+                    .clone()
                     .pollable()
                     .ok_or(Error::invalid_argument().context("file is not pollable"))?;
                 poll_as_fds.push((fd, PollFlags::IN));
@@ -22,6 +23,7 @@ pub async fn poll_oneoff<'a>(poll: &mut Poll<'a>) -> Result<(), Error> {
             Subscription::Write(f) => {
                 let fd = f
                     .file
+                    .clone()
                     .pollable()
                     .ok_or(Error::invalid_argument().context("file is not pollable"))?;
                 poll_as_fds.push((fd, PollFlags::OUT));
@@ -60,7 +62,7 @@ pub async fn poll_oneoff<'a>(poll: &mut Poll<'a>) -> Result<(), Error> {
             let revents = pollfd.revents();
             let (nbytes, rwsub) = match rwsub {
                 Subscription::Read(sub) => {
-                    let ready = sub.file.num_ready_bytes()?;
+                    let ready = sub.file.clone().num_ready_bytes()?;
                     (std::cmp::max(ready, 1), sub)
                 }
                 Subscription::Write(sub) => (0, sub),

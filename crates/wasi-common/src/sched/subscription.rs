@@ -3,6 +3,7 @@ use crate::file::WasiFile;
 use crate::Error;
 use bitflags::bitflags;
 use cap_std::time::{Duration, Instant};
+use std::sync::Arc;
 
 bitflags! {
     pub struct RwEventFlags: u32 {
@@ -10,13 +11,13 @@ bitflags! {
     }
 }
 
-pub struct RwSubscription<'a> {
-    pub file: &'a dyn WasiFile,
+pub struct RwSubscription {
+    pub file: Arc<dyn WasiFile>,
     status: Option<Result<(u64, RwEventFlags), Error>>,
 }
 
-impl<'a> RwSubscription<'a> {
-    pub fn new(file: &'a dyn WasiFile) -> Self {
+impl RwSubscription {
+    pub fn new(file: Arc<dyn WasiFile>) -> Self {
         Self { file, status: None }
     }
     pub fn complete(&mut self, size: u64, flags: RwEventFlags) {
@@ -53,8 +54,8 @@ impl<'a> MonotonicClockSubscription<'a> {
 }
 
 pub enum Subscription<'a> {
-    Read(RwSubscription<'a>),
-    Write(RwSubscription<'a>),
+    Read(RwSubscription),
+    Write(RwSubscription),
     MonotonicClock(MonotonicClockSubscription<'a>),
 }
 

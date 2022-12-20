@@ -60,23 +60,23 @@ impl From<cap_std::os::unix::net::UnixStream> for Socket {
 }
 
 #[cfg(unix)]
-impl From<Socket> for Box<dyn WasiFile> {
+impl From<Socket> for Arc<dyn WasiFile> {
     fn from(listener: Socket) -> Self {
         match listener {
-            Socket::TcpListener(l) => Box::new(crate::net::TcpListener::from_cap_std(l)),
-            Socket::UnixListener(l) => Box::new(crate::net::UnixListener::from_cap_std(l)),
-            Socket::TcpStream(l) => Box::new(crate::net::TcpStream::from_cap_std(l)),
-            Socket::UnixStream(l) => Box::new(crate::net::UnixStream::from_cap_std(l)),
+            Socket::TcpListener(l) => Arc::new(crate::net::TcpListener::from_cap_std(l)),
+            Socket::UnixListener(l) => Arc::new(crate::net::UnixListener::from_cap_std(l)),
+            Socket::TcpStream(l) => Arc::new(crate::net::TcpStream::from_cap_std(l)),
+            Socket::UnixStream(l) => Arc::new(crate::net::UnixStream::from_cap_std(l)),
         }
     }
 }
 
 #[cfg(windows)]
-impl From<Socket> for Box<dyn WasiFile> {
+impl From<Socket> for Arc<dyn WasiFile> {
     fn from(listener: Socket) -> Self {
         match listener {
-            Socket::TcpListener(l) => Box::new(crate::net::TcpListener::from_cap_std(l)),
-            Socket::TcpStream(l) => Box::new(crate::net::TcpStream::from_cap_std(l)),
+            Socket::TcpListener(l) => Arc::new(crate::net::TcpListener::from_cap_std(l)),
+            Socket::TcpStream(l) => Arc::new(crate::net::TcpStream::from_cap_std(l)),
         }
     }
 }
@@ -85,32 +85,35 @@ macro_rules! wasi_listen_write_impl {
     ($ty:ty, $stream:ty) => {
         #[async_trait::async_trait]
         impl WasiFile for $ty {
-            fn as_any(&self) -> &dyn Any {
+            fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
                 self
             }
             #[cfg(unix)]
-            fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
                 Some(Arc::new(BorrowedAsFd::new(&self.0)))
             }
             #[cfg(windows)]
-            fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
-                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(&self.0)))
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
+                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(self.0)))
             }
-            async fn sock_accept(&self, fdflags: FdFlags) -> Result<Box<dyn WasiFile>, Error> {
+            async fn sock_accept(
+                self: Arc<Self>,
+                fdflags: FdFlags,
+            ) -> Result<Arc<dyn WasiFile>, Error> {
                 let (stream, _) = self.0.accept()?;
-                let stream = <$stream>::from_cap_std(stream);
-                stream.set_fdflags(fdflags).await?;
-                Ok(Box::new(stream))
+                let stream = Arc::new(<$stream>::from_cap_std(stream));
+                stream.clone().set_fdflags(fdflags).await?;
+                Ok(stream)
             }
-            async fn get_filetype(&self) -> Result<FileType, Error> {
+            async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
                 Ok(FileType::SocketStream)
             }
             #[cfg(unix)]
-            async fn get_fdflags(&self) -> Result<FdFlags, Error> {
+            async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
                 let fdflags = get_fd_flags(&self.0)?;
                 Ok(fdflags)
             }
-            async fn set_fdflags(&self, fdflags: FdFlags) -> Result<(), Error> {
+            async fn set_fdflags(self: Arc<Self>, fdflags: FdFlags) -> Result<(), Error> {
                 if fdflags == wasi_common::file::FdFlags::NONBLOCK {
                     self.0.set_nonblocking(true)?;
                 } else if fdflags.is_empty() {
@@ -122,7 +125,7 @@ macro_rules! wasi_listen_write_impl {
                 }
                 Ok(())
             }
-            fn num_ready_bytes(&self) -> Result<u64, Error> {
+            fn num_ready_bytes(self: Arc<Self>) -> Result<u64, Error> {
                 Ok(1)
             }
         }
@@ -130,7 +133,7 @@ macro_rules! wasi_listen_write_impl {
         #[cfg(windows)]
         impl AsSocket for $ty {
             #[inline]
-            fn as_socket(&self) -> BorrowedSocket<'_> {
+            fn as_socket(self: Arc<Self>) -> BorrowedSocket<'_> {
                 self.0.as_socket()
             }
         }
@@ -178,26 +181,26 @@ macro_rules! wasi_stream_write_impl {
     ($ty:ty, $std_ty:ty) => {
         #[async_trait::async_trait]
         impl WasiFile for $ty {
-            fn as_any(&self) -> &dyn Any {
+            fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
                 self
             }
             #[cfg(unix)]
-            fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
                 Some(Arc::new(BorrowedAsFd::new(&self.0)))
             }
             #[cfg(windows)]
-            fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
-                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(&self.0)))
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
+                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(self.0)))
             }
-            async fn get_filetype(&self) -> Result<FileType, Error> {
+            async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
                 Ok(FileType::SocketStream)
             }
             #[cfg(unix)]
-            async fn get_fdflags(&self) -> Result<FdFlags, Error> {
+            async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
                 let fdflags = get_fd_flags(&self.0)?;
                 Ok(fdflags)
             }
-            async fn set_fdflags(&self, fdflags: FdFlags) -> Result<(), Error> {
+            async fn set_fdflags(self: Arc<Self>, fdflags: FdFlags) -> Result<(), Error> {
                 if fdflags == wasi_common::file::FdFlags::NONBLOCK {
                     self.0.set_nonblocking(true)?;
                 } else if fdflags.is_empty() {
@@ -210,27 +213,30 @@ macro_rules! wasi_stream_write_impl {
                 Ok(())
             }
             async fn read_vectored<'a>(
-                &self,
+                self: Arc<Self>,
                 bufs: &mut [io::IoSliceMut<'a>],
             ) -> Result<u64, Error> {
                 use std::io::Read;
                 let n = Read::read_vectored(&mut &*self.as_socketlike_view::<$std_ty>(), bufs)?;
                 Ok(n.try_into()?)
             }
-            async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
+            async fn write_vectored<'a>(
+                self: Arc<Self>,
+                bufs: &[io::IoSlice<'a>],
+            ) -> Result<u64, Error> {
                 use std::io::Write;
                 let n = Write::write_vectored(&mut &*self.as_socketlike_view::<$std_ty>(), bufs)?;
                 Ok(n.try_into()?)
             }
-            async fn peek(&self, buf: &mut [u8]) -> Result<u64, Error> {
+            async fn peek(self: Arc<Self>, buf: &mut [u8]) -> Result<u64, Error> {
                 let n = self.0.peek(buf)?;
                 Ok(n.try_into()?)
             }
-            fn num_ready_bytes(&self) -> Result<u64, Error> {
+            fn num_ready_bytes(self: Arc<Self>) -> Result<u64, Error> {
                 let val = self.as_socketlike_view::<$std_ty>().num_ready_bytes()?;
                 Ok(val)
             }
-            async fn readable(&self) -> Result<(), Error> {
+            async fn readable(self: Arc<Self>) -> Result<(), Error> {
                 let (readable, _writeable) = is_read_write(&self.0)?;
                 if readable {
                     Ok(())
@@ -238,7 +244,7 @@ macro_rules! wasi_stream_write_impl {
                     Err(Error::io())
                 }
             }
-            async fn writable(&self) -> Result<(), Error> {
+            async fn writable(self: Arc<Self>) -> Result<(), Error> {
                 let (_readable, writeable) = is_read_write(&self.0)?;
                 if writeable {
                     Ok(())
@@ -248,7 +254,7 @@ macro_rules! wasi_stream_write_impl {
             }
 
             async fn sock_recv<'a>(
-                &self,
+                self: Arc<Self>,
                 ri_data: &mut [std::io::IoSliceMut<'a>],
                 ri_flags: RiFlags,
             ) -> Result<(u64, RoFlags), Error> {
@@ -276,7 +282,7 @@ macro_rules! wasi_stream_write_impl {
             }
 
             async fn sock_send<'a>(
-                &self,
+                self: Arc<Self>,
                 si_data: &[std::io::IoSlice<'a>],
                 si_flags: SiFlags,
             ) -> Result<u64, Error> {
@@ -288,7 +294,7 @@ macro_rules! wasi_stream_write_impl {
                 Ok(n as u64)
             }
 
-            async fn sock_shutdown(&self, how: SdFlags) -> Result<(), Error> {
+            async fn sock_shutdown(self: Arc<Self>, how: SdFlags) -> Result<(), Error> {
                 let how = if how == SdFlags::RD | SdFlags::WR {
                     cap_std::net::Shutdown::Both
                 } else if how == SdFlags::RD {
@@ -312,7 +318,7 @@ macro_rules! wasi_stream_write_impl {
         #[cfg(windows)]
         impl AsSocket for $ty {
             /// Borrows the socket.
-            fn as_socket(&self) -> BorrowedSocket<'_> {
+            fn as_socket(self: Arc<Self>) -> BorrowedSocket<'_> {
                 self.0.as_socket()
             }
         }
@@ -320,7 +326,7 @@ macro_rules! wasi_stream_write_impl {
         #[cfg(windows)]
         impl AsRawHandleOrSocket for TcpStream {
             #[inline]
-            fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
+            fn as_raw_handle_or_socket(self: Arc<Self>) -> RawHandleOrSocket {
                 self.0.as_raw_handle_or_socket()
             }
         }

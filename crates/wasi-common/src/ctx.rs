@@ -33,25 +33,25 @@ impl WasiCtx {
             sched,
             table,
         };
-        s.set_stdin(Box::new(crate::pipe::ReadPipe::new(std::io::empty())));
-        s.set_stdout(Box::new(crate::pipe::WritePipe::new(std::io::sink())));
-        s.set_stderr(Box::new(crate::pipe::WritePipe::new(std::io::sink())));
+        s.set_stdin(Arc::new(crate::pipe::ReadPipe::new(std::io::empty())));
+        s.set_stdout(Arc::new(crate::pipe::WritePipe::new(std::io::sink())));
+        s.set_stderr(Arc::new(crate::pipe::WritePipe::new(std::io::sink())));
         s
     }
 
-    pub fn insert_file(&self, fd: u32, file: Box<dyn WasiFile>, caps: FileCaps) {
+    pub fn insert_file(&self, fd: u32, file: Arc<dyn WasiFile>, caps: FileCaps) {
         self.table()
             .insert_at(fd, Arc::new(FileEntry::new(caps, file)));
     }
 
-    pub fn push_file(&self, file: Box<dyn WasiFile>, caps: FileCaps) -> Result<u32, Error> {
+    pub fn push_file(&self, file: Arc<dyn WasiFile>, caps: FileCaps) -> Result<u32, Error> {
         self.table().push(Arc::new(FileEntry::new(caps, file)))
     }
 
     pub fn insert_dir(
         &self,
         fd: u32,
-        dir: Box<dyn WasiDir>,
+        dir: Arc<dyn WasiDir>,
         caps: DirCaps,
         file_caps: FileCaps,
         path: PathBuf,
@@ -64,7 +64,7 @@ impl WasiCtx {
 
     pub fn push_dir(
         &self,
-        dir: Box<dyn WasiDir>,
+        dir: Arc<dyn WasiDir>,
         caps: DirCaps,
         file_caps: FileCaps,
         path: PathBuf,
@@ -86,22 +86,22 @@ impl WasiCtx {
         Ok(())
     }
 
-    pub fn set_stdin(&self, mut f: Box<dyn WasiFile>) {
-        let rights = Self::stdio_rights(&mut *f);
+    pub fn set_stdin(&self, f: Arc<dyn WasiFile>) {
+        let rights = Self::stdio_rights(f.clone());
         self.insert_file(0, f, rights);
     }
 
-    pub fn set_stdout(&self, mut f: Box<dyn WasiFile>) {
-        let rights = Self::stdio_rights(&mut *f);
+    pub fn set_stdout(&self, f: Arc<dyn WasiFile>) {
+        let rights = Self::stdio_rights(f.clone());
         self.insert_file(1, f, rights);
     }
 
-    pub fn set_stderr(&self, mut f: Box<dyn WasiFile>) {
-        let rights = Self::stdio_rights(&mut *f);
+    pub fn set_stderr(&self, f: Arc<dyn WasiFile>) {
+        let rights = Self::stdio_rights(f.clone());
         self.insert_file(2, f, rights);
     }
 
-    fn stdio_rights(f: &mut dyn WasiFile) -> FileCaps {
+    fn stdio_rights(f: Arc<dyn WasiFile>) -> FileCaps {
         let mut rights = FileCaps::all();
 
         // If `f` is a tty, restrict the `tell` and `seek` capabilities, so
@@ -116,7 +116,7 @@ impl WasiCtx {
 
     pub fn push_preopened_dir(
         &self,
-        dir: Box<dyn WasiDir>,
+        dir: Arc<dyn WasiDir>,
         path: impl AsRef<Path>,
     ) -> Result<(), Error> {
         let caps = DirCaps::all();

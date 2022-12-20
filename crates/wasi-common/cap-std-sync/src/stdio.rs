@@ -34,46 +34,49 @@ pub fn stdin() -> Stdin {
 
 #[async_trait::async_trait]
 impl WasiFile for Stdin {
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
         self
     }
 
     #[cfg(unix)]
-    fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
         Some(Arc::new(BorrowedAsFd::new(&self.0)))
     }
 
     #[cfg(windows)]
-    fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
-        Some(Arc::new(BorrowedAsRawHandleOrSocket::new(&self.0)))
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
+        Some(Arc::new(BorrowedAsRawHandleOrSocket::new(self.0)))
     }
 
-    async fn get_filetype(&self) -> Result<FileType, Error> {
+    async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
         if self.isatty() {
             Ok(FileType::CharacterDevice)
         } else {
             Ok(FileType::Unknown)
         }
     }
-    async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
+    async fn read_vectored<'a>(
+        self: Arc<Self>,
+        bufs: &mut [io::IoSliceMut<'a>],
+    ) -> Result<u64, Error> {
         let n = (&*self.0.as_filelike_view::<File>()).read_vectored(bufs)?;
         Ok(n.try_into().map_err(|_| Error::range())?)
     }
     async fn read_vectored_at<'a>(
-        &self,
+        self: Arc<Self>,
         _bufs: &mut [io::IoSliceMut<'a>],
         _offset: u64,
     ) -> Result<u64, Error> {
         Err(Error::seek_pipe())
     }
-    async fn seek(&self, _pos: std::io::SeekFrom) -> Result<u64, Error> {
+    async fn seek(self: Arc<Self>, _pos: std::io::SeekFrom) -> Result<u64, Error> {
         Err(Error::seek_pipe())
     }
-    async fn peek(&self, _buf: &mut [u8]) -> Result<u64, Error> {
+    async fn peek(self: Arc<Self>, _buf: &mut [u8]) -> Result<u64, Error> {
         Err(Error::seek_pipe())
     }
     async fn set_times(
-        &self,
+        self: Arc<Self>,
         atime: Option<wasi_common::SystemTimeSpec>,
         mtime: Option<wasi_common::SystemTimeSpec>,
     ) -> Result<(), Error> {
@@ -81,16 +84,16 @@ impl WasiFile for Stdin {
             .set_times(convert_systimespec(atime), convert_systimespec(mtime))?;
         Ok(())
     }
-    fn num_ready_bytes(&self) -> Result<u64, Error> {
+    fn num_ready_bytes(self: Arc<Self>) -> Result<u64, Error> {
         Ok(self.0.num_ready_bytes()?)
     }
-    fn isatty(&self) -> bool {
+    fn isatty(self: Arc<Self>) -> bool {
         self.0.is_terminal()
     }
 }
 #[cfg(windows)]
 impl AsHandle for Stdin {
-    fn as_handle(&self) -> BorrowedHandle<'_> {
+    fn as_handle(self: Arc<Self>) -> BorrowedHandle<'_> {
         self.0.as_handle()
     }
 }
@@ -112,45 +115,48 @@ macro_rules! wasi_file_write_impl {
     ($ty:ty, $ident:ident) => {
         #[async_trait::async_trait]
         impl WasiFile for $ty {
-            fn as_any(&self) -> &dyn Any {
+            fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
                 self
             }
             #[cfg(unix)]
-            fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
                 Some(Arc::new(BorrowedAsFd::new(&self.0)))
             }
             #[cfg(windows)]
-            fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
-                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(&self.0)))
+            fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
+                Some(Arc::new(BorrowedAsRawHandleOrSocket::new(self.0)))
             }
-            async fn get_filetype(&self) -> Result<FileType, Error> {
+            async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
                 if self.isatty() {
                     Ok(FileType::CharacterDevice)
                 } else {
                     Ok(FileType::Unknown)
                 }
             }
-            async fn get_fdflags(&self) -> Result<FdFlags, Error> {
+            async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
                 Ok(FdFlags::APPEND)
             }
-            async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
+            async fn write_vectored<'a>(
+                self: Arc<Self>,
+                bufs: &[io::IoSlice<'a>],
+            ) -> Result<u64, Error> {
                 let n = (&*self.0.as_filelike_view::<File>()).write_vectored(bufs)?;
                 Ok(n.try_into().map_err(|_| {
                     Error::range().context("converting write_vectored total length")
                 })?)
             }
             async fn write_vectored_at<'a>(
-                &self,
+                self: Arc<Self>,
                 _bufs: &[io::IoSlice<'a>],
                 _offset: u64,
             ) -> Result<u64, Error> {
                 Err(Error::seek_pipe())
             }
-            async fn seek(&self, _pos: std::io::SeekFrom) -> Result<u64, Error> {
+            async fn seek(self: Arc<Self>, _pos: std::io::SeekFrom) -> Result<u64, Error> {
                 Err(Error::seek_pipe())
             }
             async fn set_times(
-                &self,
+                self: Arc<Self>,
                 atime: Option<wasi_common::SystemTimeSpec>,
                 mtime: Option<wasi_common::SystemTimeSpec>,
             ) -> Result<(), Error> {
@@ -158,13 +164,13 @@ macro_rules! wasi_file_write_impl {
                     .set_times(convert_systimespec(atime), convert_systimespec(mtime))?;
                 Ok(())
             }
-            fn isatty(&self) -> bool {
+            fn isatty(self: Arc<Self>) -> bool {
                 self.0.is_terminal()
             }
         }
         #[cfg(windows)]
         impl AsHandle for $ty {
-            fn as_handle(&self) -> BorrowedHandle<'_> {
+            fn as_handle(self: Arc<Self>) -> BorrowedHandle<'_> {
                 self.0.as_handle()
             }
         }

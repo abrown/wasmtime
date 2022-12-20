@@ -11,29 +11,29 @@ use io_extras::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket};
 
 #[wiggle::async_trait]
 pub trait WasiFile: Send + Sync {
-    fn as_any(&self) -> &dyn Any;
-    async fn get_filetype(&self) -> Result<FileType, Error>;
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any>;
+    async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error>;
 
     #[cfg(unix)]
-    fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
         None
     }
 
     #[cfg(windows)]
-    fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
         None
     }
 
-    fn isatty(&self) -> bool {
+    fn isatty(self: Arc<Self>) -> bool {
         false
     }
 
-    async fn sock_accept(&self, _fdflags: FdFlags) -> Result<Box<dyn WasiFile>, Error> {
+    async fn sock_accept(self: Arc<Self>, _fdflags: FdFlags) -> Result<Arc<dyn WasiFile>, Error> {
         Err(Error::badf())
     }
 
     async fn sock_recv<'a>(
-        &self,
+        self: Arc<Self>,
         _ri_data: &mut [std::io::IoSliceMut<'a>],
         _ri_flags: RiFlags,
     ) -> Result<(u64, RoFlags), Error> {
@@ -41,34 +41,34 @@ pub trait WasiFile: Send + Sync {
     }
 
     async fn sock_send<'a>(
-        &self,
+        self: Arc<Self>,
         _si_data: &[std::io::IoSlice<'a>],
         _si_flags: SiFlags,
     ) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
-    async fn sock_shutdown(&self, _how: SdFlags) -> Result<(), Error> {
+    async fn sock_shutdown(self: Arc<Self>, _how: SdFlags) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn datasync(&self) -> Result<(), Error> {
+    async fn datasync(self: Arc<Self>) -> Result<(), Error> {
         Ok(())
     }
 
-    async fn sync(&self) -> Result<(), Error> {
+    async fn sync(self: Arc<Self>) -> Result<(), Error> {
         Ok(())
     }
 
-    async fn get_fdflags(&self) -> Result<FdFlags, Error> {
+    async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
         Ok(FdFlags::empty())
     }
 
-    async fn set_fdflags(&self, _flags: FdFlags) -> Result<(), Error> {
+    async fn set_fdflags(self: Arc<Self>, _flags: FdFlags) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn get_filestat(&self) -> Result<Filestat, Error> {
+    async fn get_filestat(self: Arc<Self>) -> Result<Filestat, Error> {
         Ok(Filestat {
             device_id: 0,
             inode: 0,
@@ -81,67 +81,78 @@ pub trait WasiFile: Send + Sync {
         })
     }
 
-    async fn set_filestat_size(&self, _size: u64) -> Result<(), Error> {
+    async fn set_filestat_size(self: Arc<Self>, _size: u64) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn advise(&self, _offset: u64, _len: u64, _advice: Advice) -> Result<(), Error> {
+    async fn advise(
+        self: Arc<Self>,
+        _offset: u64,
+        _len: u64,
+        _advice: Advice,
+    ) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn allocate(&self, _offset: u64, _len: u64) -> Result<(), Error> {
+    async fn allocate(self: Arc<Self>, _offset: u64, _len: u64) -> Result<(), Error> {
         Err(Error::badf())
     }
 
     async fn set_times(
-        &self,
+        self: Arc<Self>,
         _atime: Option<SystemTimeSpec>,
         _mtime: Option<SystemTimeSpec>,
     ) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn read_vectored<'a>(&self, _bufs: &mut [std::io::IoSliceMut<'a>]) -> Result<u64, Error> {
+    async fn read_vectored<'a>(
+        self: Arc<Self>,
+        _bufs: &mut [std::io::IoSliceMut<'a>],
+    ) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
     async fn read_vectored_at<'a>(
-        &self,
+        self: Arc<Self>,
         _bufs: &mut [std::io::IoSliceMut<'a>],
         _offset: u64,
     ) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
-    async fn write_vectored<'a>(&self, _bufs: &[std::io::IoSlice<'a>]) -> Result<u64, Error> {
+    async fn write_vectored<'a>(
+        self: Arc<Self>,
+        _bufs: &[std::io::IoSlice<'a>],
+    ) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
     async fn write_vectored_at<'a>(
-        &self,
+        self: Arc<Self>,
         _bufs: &[std::io::IoSlice<'a>],
         _offset: u64,
     ) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
-    async fn seek(&self, _pos: std::io::SeekFrom) -> Result<u64, Error> {
+    async fn seek(self: Arc<Self>, _pos: std::io::SeekFrom) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
-    async fn peek(&self, _buf: &mut [u8]) -> Result<u64, Error> {
+    async fn peek(self: Arc<Self>, _buf: &mut [u8]) -> Result<u64, Error> {
         Err(Error::badf())
     }
 
-    fn num_ready_bytes(&self) -> Result<u64, Error> {
+    fn num_ready_bytes(self: Arc<Self>) -> Result<u64, Error> {
         Ok(0)
     }
 
-    async fn readable(&self) -> Result<(), Error> {
+    async fn readable(self: Arc<Self>) -> Result<(), Error> {
         Err(Error::badf())
     }
 
-    async fn writable(&self) -> Result<(), Error> {
+    async fn writable(self: Arc<Self>) -> Result<(), Error> {
         Err(Error::badf())
     }
 }
@@ -226,11 +237,11 @@ impl TableFileExt for crate::table::Table {
 
 pub(crate) struct FileEntry {
     caps: RwLock<FileCaps>,
-    file: Box<dyn WasiFile>,
+    file: Arc<dyn WasiFile>,
 }
 
 impl FileEntry {
-    pub fn new(caps: FileCaps, file: Box<dyn WasiFile>) -> Self {
+    pub fn new(caps: FileCaps, file: Arc<dyn WasiFile>) -> Self {
         FileEntry {
             caps: RwLock::new(caps),
             file,
@@ -263,21 +274,21 @@ impl FileEntry {
     pub async fn get_fdstat(&self) -> Result<FdStat, Error> {
         let caps = self.caps.read().unwrap().clone();
         Ok(FdStat {
-            filetype: self.file.get_filetype().await?,
+            filetype: self.file.clone().get_filetype().await?,
             caps,
-            flags: self.file.get_fdflags().await?,
+            flags: self.file.clone().get_fdflags().await?,
         })
     }
 }
 
 pub trait FileEntryExt {
-    fn get_cap(&self, caps: FileCaps) -> Result<&dyn WasiFile, Error>;
+    fn get_cap(&self, caps: FileCaps) -> Result<Arc<dyn WasiFile>, Error>;
 }
 
 impl FileEntryExt for FileEntry {
-    fn get_cap(&self, caps: FileCaps) -> Result<&dyn WasiFile, Error> {
+    fn get_cap(&self, caps: FileCaps) -> Result<Arc<dyn WasiFile>, Error> {
         self.capable_of(caps)?;
-        Ok(&*self.file)
+        Ok(self.file.clone())
     }
 }
 

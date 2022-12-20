@@ -102,13 +102,16 @@ impl From<&str> for ReadPipe<io::Cursor<String>> {
 
 #[wiggle::async_trait]
 impl<R: Read + Any + Send + Sync> WasiFile for ReadPipe<R> {
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
         self
     }
-    async fn get_filetype(&self) -> Result<FileType, Error> {
+    async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
         Ok(FileType::Pipe)
     }
-    async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
+    async fn read_vectored<'a>(
+        self: Arc<Self>,
+        bufs: &mut [io::IoSliceMut<'a>],
+    ) -> Result<u64, Error> {
         let n = self.borrow().read_vectored(bufs)?;
         Ok(n.try_into()?)
     }
@@ -186,16 +189,16 @@ impl WritePipe<io::Cursor<Vec<u8>>> {
 
 #[wiggle::async_trait]
 impl<W: Write + Any + Send + Sync> WasiFile for WritePipe<W> {
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
         self
     }
-    async fn get_filetype(&self) -> Result<FileType, Error> {
+    async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
         Ok(FileType::Pipe)
     }
-    async fn get_fdflags(&self) -> Result<FdFlags, Error> {
+    async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
         Ok(FdFlags::APPEND)
     }
-    async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
+    async fn write_vectored<'a>(self: Arc<Self>, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
         let n = self.borrow().write_vectored(bufs)?;
         Ok(n.try_into()?)
     }

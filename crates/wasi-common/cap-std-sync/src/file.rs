@@ -24,76 +24,47 @@ use io_lifetimes::{AsHandle, BorrowedHandle};
 #[cfg(windows)]
 use io_extras::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket};
 
-pub struct BorrowedFile<'a>(RwLockReadGuard<'a, cap_std::fs::File>);
-
-#[cfg(unix)]
-impl AsFd for BorrowedFile<'_> {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.0.as_fd()
-    }
-}
-
-#[cfg(windows)]
-impl AsHandle for BorrowedFile<'_> {
-    fn as_handle(&self) -> BorrowedHandle<'_> {
-        self.0.as_handle()
-    }
-}
-
-#[cfg(windows)]
-impl AsRawHandleOrSocket for BorrowedFile<'_> {
-    #[inline]
-    fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
-        self.0.as_raw_handle_or_socket()
-    }
-}
-
-pub struct File(RwLock<cap_std::fs::File>);
+pub struct File(cap_std::fs::File);
 
 impl File {
     pub fn from_cap_std(file: cap_std::fs::File) -> Self {
-        File(RwLock::new(file))
-    }
-
-    pub fn borrow(&self) -> BorrowedFile {
-        BorrowedFile(self.0.read().unwrap())
+        File(file)
     }
 }
 
 #[async_trait::async_trait]
 impl WasiFile for File {
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
         self
     }
 
     #[cfg(unix)]
-    fn pollable(&self) -> Option<Arc<dyn AsFd + '_>> {
-        Some(Arc::new(self.borrow()))
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsFd>> {
+        Some(Arc::new(self.0.as_fd()))
     }
 
     #[cfg(windows)]
-    fn pollable(&self) -> Option<Arc<dyn AsRawHandleOrSocket + '_>> {
-        Some(Arc::new(BorrowedFile(self.0.read().unwrap())))
+    fn pollable(self: Arc<Self>) -> Option<Arc<dyn AsRawHandleOrSocket>> {
+        Some(Arc::new(BorrowedFile(self.0)))
     }
 
-    async fn datasync(&self) -> Result<(), Error> {
-        self.0.read().unwrap().sync_data()?;
+    async fn datasync(self: Arc<Self>) -> Result<(), Error> {
+        self.0.sync_data()?;
         Ok(())
     }
-    async fn sync(&self) -> Result<(), Error> {
-        self.0.read().unwrap().sync_all()?;
+    async fn sync(self: Arc<Self>) -> Result<(), Error> {
+        self.0.sync_all()?;
         Ok(())
     }
-    async fn get_filetype(&self) -> Result<FileType, Error> {
-        let meta = self.0.read().unwrap().metadata()?;
+    async fn get_filetype(self: Arc<Self>) -> Result<FileType, Error> {
+        let meta = self.0.metadata()?;
         Ok(filetype_from(&meta.file_type()))
     }
-    async fn get_fdflags(&self) -> Result<FdFlags, Error> {
-        let file = self.0.read().unwrap();
-        let fdflags = get_fd_flags(&*file)?;
+    async fn get_fdflags(self: Arc<Self>) -> Result<FdFlags, Error> {
+        let fdflags = get_fd_flags(self.0)?;
         Ok(fdflags)
     }
-    async fn set_fdflags(&self, fdflags: FdFlags) -> Result<(), Error> {
+    async fn set_fdflags(mut self: Arc<Self>, fdflags: FdFlags) -> Result<(), Error> {
         if fdflags.intersects(
             wasi_common::file::FdFlags::DSYNC
                 | wasi_common::file::FdFlags::SYNC
@@ -101,13 +72,15 @@ impl WasiFile for File {
         ) {
             return Err(Error::invalid_argument().context("cannot set DSYNC, SYNC, or RSYNC flag"));
         }
-        let mut file = self.0.write().unwrap();
-        let set_fd_flags = (*file).new_set_fd_flags(to_sysif_fdflags(fdflags))?;
-        (*file).set_fd_flags(set_fd_flags)?;
+        let set_fd_flags = self.0.new_set_fd_flags(to_sysif_fdflags(fdflags))?;
+        Arc::get_mut(&mut self)
+            .unwrap()
+            .0
+            .set_fd_flags(set_fd_flags)?;
         Ok(())
     }
-    async fn get_filestat(&self) -> Result<Filestat, Error> {
-        let meta = self.0.read().unwrap().metadata()?;
+    async fn get_filestat(self: Arc<Self>) -> Result<Filestat, Error> {
+        let meta = self.0.metadata()?;
         Ok(Filestat {
             device_id: meta.dev(),
             inode: meta.ino(),
@@ -119,68 +92,66 @@ impl WasiFile for File {
             ctim: meta.created().map(|t| Some(t.into_std())).unwrap_or(None),
         })
     }
-    async fn set_filestat_size(&self, size: u64) -> Result<(), Error> {
-        self.0.read().unwrap().set_len(size)?;
+    async fn set_filestat_size(self: Arc<Self>, size: u64) -> Result<(), Error> {
+        self.0.set_len(size)?;
         Ok(())
     }
-    async fn advise(&self, offset: u64, len: u64, advice: Advice) -> Result<(), Error> {
-        self.0
-            .read()
-            .unwrap()
-            .advise(offset, len, convert_advice(advice))?;
+    async fn advise(self: Arc<Self>, offset: u64, len: u64, advice: Advice) -> Result<(), Error> {
+        self.0.advise(offset, len, convert_advice(advice))?;
         Ok(())
     }
-    async fn allocate(&self, offset: u64, len: u64) -> Result<(), Error> {
-        self.0.read().unwrap().allocate(offset, len)?;
+    async fn allocate(self: Arc<Self>, offset: u64, len: u64) -> Result<(), Error> {
+        self.0.allocate(offset, len)?;
         Ok(())
     }
     async fn set_times(
-        &self,
+        self: Arc<Self>,
         atime: Option<wasi_common::SystemTimeSpec>,
         mtime: Option<wasi_common::SystemTimeSpec>,
     ) -> Result<(), Error> {
         self.0
-            .read()
-            .unwrap()
             .set_times(convert_systimespec(atime), convert_systimespec(mtime))?;
         Ok(())
     }
-    async fn read_vectored<'a>(&self, bufs: &mut [io::IoSliceMut<'a>]) -> Result<u64, Error> {
-        let n = self.0.read().unwrap().read_vectored(bufs)?;
+    async fn read_vectored<'a>(
+        self: Arc<Self>,
+        bufs: &mut [io::IoSliceMut<'a>],
+    ) -> Result<u64, Error> {
+        let n = self.0.read_vectored(bufs)?;
         Ok(n.try_into()?)
     }
     async fn read_vectored_at<'a>(
-        &self,
+        self: Arc<Self>,
         bufs: &mut [io::IoSliceMut<'a>],
         offset: u64,
     ) -> Result<u64, Error> {
-        let n = self.0.read().unwrap().read_vectored_at(bufs, offset)?;
+        let n = self.0.read_vectored_at(bufs, offset)?;
         Ok(n.try_into()?)
     }
-    async fn write_vectored<'a>(&self, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
-        let n = self.0.read().unwrap().write_vectored(bufs)?;
+    async fn write_vectored<'a>(self: Arc<Self>, bufs: &[io::IoSlice<'a>]) -> Result<u64, Error> {
+        let n = self.0.write_vectored(bufs)?;
         Ok(n.try_into()?)
     }
     async fn write_vectored_at<'a>(
-        &self,
+        self: Arc<Self>,
         bufs: &[io::IoSlice<'a>],
         offset: u64,
     ) -> Result<u64, Error> {
-        let n = self.0.read().unwrap().write_vectored_at(bufs, offset)?;
+        let n = self.0.write_vectored_at(bufs, offset)?;
         Ok(n.try_into()?)
     }
-    async fn seek(&self, pos: std::io::SeekFrom) -> Result<u64, Error> {
-        Ok(self.0.read().unwrap().seek(pos)?)
+    async fn seek(self: Arc<Self>, pos: std::io::SeekFrom) -> Result<u64, Error> {
+        Ok(self.0.seek(pos)?)
     }
-    async fn peek(&self, buf: &mut [u8]) -> Result<u64, Error> {
-        let n = self.0.read().unwrap().peek(buf)?;
+    async fn peek(self: Arc<Self>, buf: &mut [u8]) -> Result<u64, Error> {
+        let n = self.0.peek(buf)?;
         Ok(n.try_into()?)
     }
-    fn num_ready_bytes(&self) -> Result<u64, Error> {
-        Ok(self.0.read().unwrap().num_ready_bytes()?)
+    fn num_ready_bytes(self: Arc<Self>) -> Result<u64, Error> {
+        Ok(self.0.num_ready_bytes()?)
     }
-    fn isatty(&self) -> bool {
-        self.0.read().unwrap().is_terminal()
+    fn isatty(self: Arc<Self>) -> bool {
+        self.0.is_terminal()
     }
 }
 

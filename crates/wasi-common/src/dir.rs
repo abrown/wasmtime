@@ -7,62 +7,62 @@ use std::sync::{Arc, RwLock};
 
 #[wiggle::async_trait]
 pub trait WasiDir: Send + Sync {
-    fn as_any(&self) -> &dyn Any;
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any>;
 
     async fn open_file(
-        &self,
+        self: Arc<Self>,
         _symlink_follow: bool,
         _path: &str,
         _oflags: OFlags,
         _read: bool,
         _write: bool,
         _fdflags: FdFlags,
-    ) -> Result<Box<dyn WasiFile>, Error> {
+    ) -> Result<Arc<dyn WasiFile>, Error> {
         Err(Error::not_supported())
     }
 
     async fn open_dir(
-        &self,
+        self: Arc<Self>,
         _symlink_follow: bool,
         _path: &str,
-    ) -> Result<Box<dyn WasiDir>, Error> {
+    ) -> Result<Arc<dyn WasiDir>, Error> {
         Err(Error::not_supported())
     }
 
-    async fn create_dir(&self, _path: &str) -> Result<(), Error> {
+    async fn create_dir(self: Arc<Self>, _path: &str) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
     // XXX the iterator here needs to be asyncified as well!
     async fn readdir(
-        &self,
+        self: Arc<Self>,
         _cursor: ReaddirCursor,
     ) -> Result<Box<dyn Iterator<Item = Result<ReaddirEntity, Error>> + Send>, Error> {
         Err(Error::not_supported())
     }
 
-    async fn symlink(&self, _old_path: &str, _new_path: &str) -> Result<(), Error> {
+    async fn symlink(self: Arc<Self>, _old_path: &str, _new_path: &str) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
-    async fn remove_dir(&self, _path: &str) -> Result<(), Error> {
+    async fn remove_dir(self: Arc<Self>, _path: &str) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
-    async fn unlink_file(&self, _path: &str) -> Result<(), Error> {
+    async fn unlink_file(self: Arc<Self>, _path: &str) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
-    async fn read_link(&self, _path: &str) -> Result<PathBuf, Error> {
+    async fn read_link(self: Arc<Self>, _path: &str) -> Result<PathBuf, Error> {
         Err(Error::not_supported())
     }
 
-    async fn get_filestat(&self) -> Result<Filestat, Error> {
+    async fn get_filestat(self: Arc<Self>) -> Result<Filestat, Error> {
         Err(Error::not_supported())
     }
 
     async fn get_path_filestat(
-        &self,
+        self: Arc<Self>,
         _path: &str,
         _follow_symlinks: bool,
     ) -> Result<Filestat, Error> {
@@ -70,25 +70,25 @@ pub trait WasiDir: Send + Sync {
     }
 
     async fn rename(
-        &self,
+        self: Arc<Self>,
         _path: &str,
-        _dest_dir: &dyn WasiDir,
+        _dest_dir: Arc<dyn WasiDir>,
         _dest_path: &str,
     ) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
     async fn hard_link(
-        &self,
+        self: Arc<Self>,
         _path: &str,
-        _target_dir: &dyn WasiDir,
+        _target_dir: Arc<dyn WasiDir>,
         _target_path: &str,
     ) -> Result<(), Error> {
         Err(Error::not_supported())
     }
 
     async fn set_times(
-        &self,
+        self: Arc<Self>,
         _path: &str,
         _atime: Option<SystemTimeSpec>,
         _mtime: Option<SystemTimeSpec>,
@@ -101,7 +101,7 @@ pub trait WasiDir: Send + Sync {
 pub(crate) struct DirEntry {
     caps: RwLock<DirFdStat>,
     preopen_path: Option<PathBuf>, // precondition: PathBuf is valid unicode
-    dir: Box<dyn WasiDir>,
+    dir: Arc<dyn WasiDir>,
 }
 
 impl DirEntry {
@@ -109,7 +109,7 @@ impl DirEntry {
         dir_caps: DirCaps,
         file_caps: FileCaps,
         preopen_path: Option<PathBuf>,
-        dir: Box<dyn WasiDir>,
+        dir: Arc<dyn WasiDir>,
     ) -> Self {
         DirEntry {
             caps: RwLock::new(DirFdStat {
@@ -150,13 +150,13 @@ impl DirEntry {
 }
 
 pub trait DirEntryExt {
-    fn get_cap(&self, caps: DirCaps) -> Result<&dyn WasiDir, Error>;
+    fn get_cap(&self, caps: DirCaps) -> Result<Arc<dyn WasiDir>, Error>;
 }
 
 impl DirEntryExt for DirEntry {
-    fn get_cap(&self, caps: DirCaps) -> Result<&dyn WasiDir, Error> {
+    fn get_cap(&self, caps: DirCaps) -> Result<Arc<dyn WasiDir>, Error> {
         self.capable_of_dir(caps)?;
-        Ok(&*self.dir)
+        Ok(self.dir.clone())
     }
 }
 

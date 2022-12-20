@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::clocks::WasiMonotonicClock;
 use crate::file::WasiFile;
 use crate::Error;
@@ -56,11 +58,11 @@ impl<'a> Poll<'a> {
             ud,
         ));
     }
-    pub fn subscribe_read(&mut self, file: &'a dyn WasiFile, ud: Userdata) {
+    pub fn subscribe_read(&mut self, file: Arc<dyn WasiFile>, ud: Userdata) {
         self.subs
             .push((Subscription::Read(RwSubscription::new(file)), ud));
     }
-    pub fn subscribe_write(&mut self, file: &'a dyn WasiFile, ud: Userdata) {
+    pub fn subscribe_write(&mut self, file: Arc<dyn WasiFile>, ud: Userdata) {
         self.subs
             .push((Subscription::Write(RwSubscription::new(file)), ud));
     }

@@ -638,7 +638,7 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
         src_dir
             .hard_link(
                 src_path.as_str()?.expect("cannot use with shared memories; see https://github.com/bytecodealliance/wasmtime/issues/5235 (TODO)").deref(),
-                target_dir.deref(),
+                target_dir,
                 target_path.as_str()?.expect("cannot use with shared memories; see https://github.com/bytecodealliance/wasmtime/issues/5235 (TODO)").deref(),
             )
             .await
@@ -676,7 +676,7 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
             let dir_caps = dir_entry.child_dir_caps(DirCaps::from(&fs_rights_base));
             let file_caps = dir_entry.child_file_caps(FileCaps::from(&fs_rights_inheriting));
             let dir = dir_entry.get_cap(DirCaps::OPEN)?;
-            let child_dir = dir.open_dir(symlink_follow, path.deref()).await?;
+            let child_dir = dir.clone().open_dir(symlink_follow, path.deref()).await?;
             drop(dir);
             let fd = table.push(Arc::new(DirEntry::new(
                 dir_caps, file_caps, None, child_dir,
@@ -695,6 +695,7 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
                 || file_caps.contains(FileCaps::ALLOCATE)
                 || file_caps.contains(FileCaps::FILESTAT_SET_SIZE);
             let file = dir
+                .clone()
                 .open_file(symlink_follow, path.deref(), oflags, read, write, fdflags)
                 .await?;
             drop(dir);
@@ -759,7 +760,7 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
         src_dir
             .rename(
                 src_path.as_str()?.expect("cannot use with shared memories; see https://github.com/bytecodealliance/wasmtime/issues/5235 (TODO)").deref(),
-                dest_dir.deref(),
+                dest_dir,
                 dest_path.as_str()?.expect("cannot use with shared memories; see https://github.com/bytecodealliance/wasmtime/issues/5235 (TODO)").deref(),
             )
             .await
@@ -910,24 +911,24 @@ impl wasi_snapshot_preview1::WasiSnapshotPreview1 for WasiCtx {
             }
         }
 
-        let mut read_mut_refs: Vec<(&dyn WasiFile, Userdata)> = Vec::new();
+        let mut read_mut_refs: Vec<(Arc<dyn WasiFile>, Userdata)> = Vec::new();
         for (file_lock, userdata) in read_refs.iter_mut() {
             let file = file_lock.get_cap(FileCaps::POLL_READWRITE)?;
             read_mut_refs.push((file, userdata.take().unwrap()));
         }
 
         for (f, ud) in read_mut_refs.iter_mut() {
-            poll.subscribe_read(*f, *ud);
+            poll.subscribe_read(f.clone(), *ud);
         }
 
-        let mut write_mut_refs: Vec<(&dyn WasiFile, Userdata)> = Vec::new();
+        let mut write_mut_refs: Vec<(Arc<dyn WasiFile>, Userdata)> = Vec::new();
         for (file_lock, userdata) in write_refs.iter_mut() {
             let file = file_lock.get_cap(FileCaps::POLL_READWRITE)?;
             write_mut_refs.push((file, userdata.take().unwrap()));
         }
 
         for (f, ud) in write_mut_refs.iter_mut() {
-            poll.subscribe_write(*f, *ud);
+            poll.subscribe_write(f.clone(), *ud);
         }
 
         self.sched.poll_oneoff(&mut poll).await?;

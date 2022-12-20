@@ -2,6 +2,7 @@ use crate::file::{filetype_from, File};
 use cap_fs_ext::{DirEntryExt, DirExt, MetadataExt, SystemTimeSpec};
 use std::any::Any;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use system_interface::fs::GetSetFdFlags;
 use wasi_common::{
     dir::{ReaddirCursor, ReaddirEntity, WasiDir},
@@ -109,33 +110,37 @@ impl Dir {
 
 #[async_trait::async_trait]
 impl WasiDir for Dir {
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(self: Arc<Self>) -> Arc<dyn Any> {
         self
     }
     async fn open_file(
-        &self,
+        self: Arc<Self>,
         symlink_follow: bool,
         path: &str,
         oflags: OFlags,
         read: bool,
         write: bool,
         fdflags: FdFlags,
-    ) -> Result<Box<dyn WasiFile>, Error> {
+    ) -> Result<Arc<dyn WasiFile>, Error> {
         let f = self.open_file_(symlink_follow, path, oflags, read, write, fdflags)?;
-        Ok(Box::new(f))
+        Ok(Arc::new(f))
     }
 
-    async fn open_dir(&self, symlink_follow: bool, path: &str) -> Result<Box<dyn WasiDir>, Error> {
+    async fn open_dir(
+        self: Arc<Self>,
+        symlink_follow: bool,
+        path: &str,
+    ) -> Result<Arc<dyn WasiDir>, Error> {
         let d = self.open_dir_(symlink_follow, path)?;
-        Ok(Box::new(d))
+        Ok(Arc::new(d))
     }
 
-    async fn create_dir(&self, path: &str) -> Result<(), Error> {
+    async fn create_dir(self: Arc<Self>, path: &str) -> Result<(), Error> {
         self.0.create_dir(Path::new(path))?;
         Ok(())
     }
     async fn readdir(
-        &self,
+        self: Arc<Self>,
         cursor: ReaddirCursor,
     ) -> Result<Box<dyn Iterator<Item = Result<ReaddirEntity, Error>> + Send>, Error> {
         // We need to keep a full-fidelity io Error around to check for a special failure mode
@@ -216,24 +221,24 @@ impl WasiDir for Dir {
         Ok(Box::new(rd))
     }
 
-    async fn symlink(&self, src_path: &str, dest_path: &str) -> Result<(), Error> {
+    async fn symlink(self: Arc<Self>, src_path: &str, dest_path: &str) -> Result<(), Error> {
         self.0.symlink(src_path, dest_path)?;
         Ok(())
     }
-    async fn remove_dir(&self, path: &str) -> Result<(), Error> {
+    async fn remove_dir(self: Arc<Self>, path: &str) -> Result<(), Error> {
         self.0.remove_dir(Path::new(path))?;
         Ok(())
     }
 
-    async fn unlink_file(&self, path: &str) -> Result<(), Error> {
+    async fn unlink_file(self: Arc<Self>, path: &str) -> Result<(), Error> {
         self.0.remove_file_or_symlink(Path::new(path))?;
         Ok(())
     }
-    async fn read_link(&self, path: &str) -> Result<PathBuf, Error> {
+    async fn read_link(self: Arc<Self>, path: &str) -> Result<PathBuf, Error> {
         let link = self.0.read_link(Path::new(path))?;
         Ok(link)
     }
-    async fn get_filestat(&self) -> Result<Filestat, Error> {
+    async fn get_filestat(self: Arc<Self>) -> Result<Filestat, Error> {
         let meta = self.0.dir_metadata()?;
         Ok(Filestat {
             device_id: meta.dev(),
@@ -247,7 +252,7 @@ impl WasiDir for Dir {
         })
     }
     async fn get_path_filestat(
-        &self,
+        self: Arc<Self>,
         path: &str,
         follow_symlinks: bool,
     ) -> Result<Filestat, Error> {
@@ -268,9 +273,9 @@ impl WasiDir for Dir {
         })
     }
     async fn rename(
-        &self,
+        self: Arc<Self>,
         src_path: &str,
-        dest_dir: &dyn WasiDir,
+        dest_dir: Arc<dyn WasiDir>,
         dest_path: &str,
     ) -> Result<(), Error> {
         let dest_dir = dest_dir
@@ -280,9 +285,9 @@ impl WasiDir for Dir {
         self.rename_(src_path, dest_dir, dest_path)
     }
     async fn hard_link(
-        &self,
+        self: Arc<Self>,
         src_path: &str,
-        target_dir: &dyn WasiDir,
+        target_dir: Arc<dyn WasiDir>,
         target_path: &str,
     ) -> Result<(), Error> {
         let target_dir = target_dir
@@ -292,7 +297,7 @@ impl WasiDir for Dir {
         self.hard_link_(src_path, target_dir, target_path)
     }
     async fn set_times(
-        &self,
+        self: Arc<Self>,
         path: &str,
         atime: Option<wasi_common::SystemTimeSpec>,
         mtime: Option<wasi_common::SystemTimeSpec>,
