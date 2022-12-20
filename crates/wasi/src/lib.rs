@@ -77,7 +77,8 @@ pub mod snapshots {
             // the `WASI_ROOT` env variable, which is set in wasi-common's `build.rs`.
             witx: ["$WASI_ROOT/phases/old/snapshot_0/witx/wasi_unstable.witx"],
             errors: { errno => trappable Error },
-            $async_mode: *
+            $async_mode: *,
+            mutable: false,
         });
     }
 }

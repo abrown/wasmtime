@@ -18,6 +18,7 @@ wiggle::from_witx!({
     errors: { errno => trappable Error },
     async: *,
     wasmtime: false,
+    mutable: false,
 });
 
 use types::Error;
@@ -389,7 +390,7 @@ convert_flags_bidirectional!(
 #[wiggle::async_trait]
 impl wasi_unstable::WasiUnstable for WasiCtx {
     async fn args_get<'a>(
-        &mut self,
+        &self,
         argv: &GuestPtr<'a, GuestPtr<'a, u8>>,
         argv_buf: &GuestPtr<'a, u8>,
     ) -> Result<(), Error> {
@@ -397,13 +398,13 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(())
     }
 
-    async fn args_sizes_get(&mut self) -> Result<(types::Size, types::Size), Error> {
+    async fn args_sizes_get(&self) -> Result<(types::Size, types::Size), Error> {
         let s = Snapshot1::args_sizes_get(self).await?;
         Ok(s)
     }
 
     async fn environ_get<'a>(
-        &mut self,
+        &self,
         environ: &GuestPtr<'a, GuestPtr<'a, u8>>,
         environ_buf: &GuestPtr<'a, u8>,
     ) -> Result<(), Error> {
@@ -411,18 +412,18 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(())
     }
 
-    async fn environ_sizes_get(&mut self) -> Result<(types::Size, types::Size), Error> {
+    async fn environ_sizes_get(&self) -> Result<(types::Size, types::Size), Error> {
         let s = Snapshot1::environ_sizes_get(self).await?;
         Ok(s)
     }
 
-    async fn clock_res_get(&mut self, id: types::Clockid) -> Result<types::Timestamp, Error> {
+    async fn clock_res_get(&self, id: types::Clockid) -> Result<types::Timestamp, Error> {
         let t = Snapshot1::clock_res_get(self, id.into()).await?;
         Ok(t)
     }
 
     async fn clock_time_get(
-        &mut self,
+        &self,
         id: types::Clockid,
         precision: types::Timestamp,
     ) -> Result<types::Timestamp, Error> {
@@ -431,7 +432,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_advise(
-        &mut self,
+        &self,
         fd: types::Fd,
         offset: types::Filesize,
         len: types::Filesize,
@@ -442,7 +443,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_allocate(
-        &mut self,
+        &self,
         fd: types::Fd,
         offset: types::Filesize,
         len: types::Filesize,
@@ -451,31 +452,27 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(())
     }
 
-    async fn fd_close(&mut self, fd: types::Fd) -> Result<(), Error> {
+    async fn fd_close(&self, fd: types::Fd) -> Result<(), Error> {
         Snapshot1::fd_close(self, fd.into()).await?;
         Ok(())
     }
 
-    async fn fd_datasync(&mut self, fd: types::Fd) -> Result<(), Error> {
+    async fn fd_datasync(&self, fd: types::Fd) -> Result<(), Error> {
         Snapshot1::fd_datasync(self, fd.into()).await?;
         Ok(())
     }
 
-    async fn fd_fdstat_get(&mut self, fd: types::Fd) -> Result<types::Fdstat, Error> {
+    async fn fd_fdstat_get(&self, fd: types::Fd) -> Result<types::Fdstat, Error> {
         Ok(Snapshot1::fd_fdstat_get(self, fd.into()).await?.into())
     }
 
-    async fn fd_fdstat_set_flags(
-        &mut self,
-        fd: types::Fd,
-        flags: types::Fdflags,
-    ) -> Result<(), Error> {
+    async fn fd_fdstat_set_flags(&self, fd: types::Fd, flags: types::Fdflags) -> Result<(), Error> {
         Snapshot1::fd_fdstat_set_flags(self, fd.into(), flags.into()).await?;
         Ok(())
     }
 
     async fn fd_fdstat_set_rights(
-        &mut self,
+        &self,
         fd: types::Fd,
         fs_rights_base: types::Rights,
         fs_rights_inheriting: types::Rights,
@@ -490,12 +487,12 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(())
     }
 
-    async fn fd_filestat_get(&mut self, fd: types::Fd) -> Result<types::Filestat, Error> {
+    async fn fd_filestat_get(&self, fd: types::Fd) -> Result<types::Filestat, Error> {
         Ok(Snapshot1::fd_filestat_get(self, fd.into()).await?.into())
     }
 
     async fn fd_filestat_set_size(
-        &mut self,
+        &self,
         fd: types::Fd,
         size: types::Filesize,
     ) -> Result<(), Error> {
@@ -504,7 +501,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_filestat_set_times(
-        &mut self,
+        &self,
         fd: types::Fd,
         atim: types::Timestamp,
         mtim: types::Timestamp,
@@ -523,7 +520,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     // representation to a std::io::IoSlice(Mut) representation.
 
     async fn fd_read<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         iovs: &types::IovecArray<'a>,
     ) -> Result<types::Size, Error> {
@@ -551,7 +548,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_pread<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         iovs: &types::IovecArray<'a>,
         offset: types::Filesize,
@@ -580,7 +577,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_write<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         ciovs: &types::CiovecArray<'a>,
     ) -> Result<types::Size, Error> {
@@ -610,7 +607,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn fd_pwrite<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         ciovs: &types::CiovecArray<'a>,
         offset: types::Filesize,
@@ -640,12 +637,12 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(types::Size::try_from(bytes_written)?)
     }
 
-    async fn fd_prestat_get(&mut self, fd: types::Fd) -> Result<types::Prestat, Error> {
+    async fn fd_prestat_get(&self, fd: types::Fd) -> Result<types::Prestat, Error> {
         Ok(Snapshot1::fd_prestat_get(self, fd.into()).await?.into())
     }
 
     async fn fd_prestat_dir_name<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         path: &GuestPtr<'a, u8>,
         path_max_len: types::Size,
@@ -654,13 +651,13 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(())
     }
 
-    async fn fd_renumber(&mut self, from: types::Fd, to: types::Fd) -> Result<(), Error> {
+    async fn fd_renumber(&self, from: types::Fd, to: types::Fd) -> Result<(), Error> {
         Snapshot1::fd_renumber(self, from.into(), to.into()).await?;
         Ok(())
     }
 
     async fn fd_seek(
-        &mut self,
+        &self,
         fd: types::Fd,
         offset: types::Filedelta,
         whence: types::Whence,
@@ -668,17 +665,17 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(Snapshot1::fd_seek(self, fd.into(), offset, whence.into()).await?)
     }
 
-    async fn fd_sync(&mut self, fd: types::Fd) -> Result<(), Error> {
+    async fn fd_sync(&self, fd: types::Fd) -> Result<(), Error> {
         Snapshot1::fd_sync(self, fd.into()).await?;
         Ok(())
     }
 
-    async fn fd_tell(&mut self, fd: types::Fd) -> Result<types::Filesize, Error> {
+    async fn fd_tell(&self, fd: types::Fd) -> Result<types::Filesize, Error> {
         Ok(Snapshot1::fd_tell(self, fd.into()).await?)
     }
 
     async fn fd_readdir<'a>(
-        &mut self,
+        &self,
         fd: types::Fd,
         buf: &GuestPtr<'a, u8>,
         buf_len: types::Size,
@@ -688,7 +685,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_create_directory<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         path: &GuestPtr<'a, str>,
     ) -> Result<(), Error> {
@@ -697,7 +694,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_filestat_get<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         flags: types::Lookupflags,
         path: &GuestPtr<'a, str>,
@@ -710,7 +707,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_filestat_set_times<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         flags: types::Lookupflags,
         path: &GuestPtr<'a, str>,
@@ -732,7 +729,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_link<'a>(
-        &mut self,
+        &self,
         src_fd: types::Fd,
         src_flags: types::Lookupflags,
         src_path: &GuestPtr<'a, str>,
@@ -752,7 +749,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_open<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         dirflags: types::Lookupflags,
         path: &GuestPtr<'a, str>,
@@ -776,7 +773,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_readlink<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         path: &GuestPtr<'a, str>,
         buf: &GuestPtr<'a, u8>,
@@ -786,7 +783,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_remove_directory<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         path: &GuestPtr<'a, str>,
     ) -> Result<(), Error> {
@@ -795,7 +792,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_rename<'a>(
-        &mut self,
+        &self,
         src_fd: types::Fd,
         src_path: &GuestPtr<'a, str>,
         dest_fd: types::Fd,
@@ -806,7 +803,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_symlink<'a>(
-        &mut self,
+        &self,
         src_path: &GuestPtr<'a, str>,
         dirfd: types::Fd,
         dest_path: &GuestPtr<'a, str>,
@@ -816,7 +813,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn path_unlink_file<'a>(
-        &mut self,
+        &self,
         dirfd: types::Fd,
         path: &GuestPtr<'a, str>,
     ) -> Result<(), Error> {
@@ -832,7 +829,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     // The bodies of these functions is mostly about converting the GuestPtr and types::-based
     // representation to use the Poll abstraction.
     async fn poll_oneoff<'a>(
-        &mut self,
+        &self,
         subs: &GuestPtr<'a, types::Subscription>,
         events: &GuestPtr<'a, types::Event>,
         nsubscriptions: types::Size,
@@ -1011,21 +1008,21 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Ok(num_results.try_into().expect("results fit into memory"))
     }
 
-    async fn proc_exit(&mut self, status: types::Exitcode) -> anyhow::Error {
+    async fn proc_exit(&self, status: types::Exitcode) -> anyhow::Error {
         Snapshot1::proc_exit(self, status).await
     }
 
-    async fn proc_raise(&mut self, _sig: types::Signal) -> Result<(), Error> {
+    async fn proc_raise(&self, _sig: types::Signal) -> Result<(), Error> {
         Err(Error::trap(anyhow::Error::msg("proc_raise unsupported")))
     }
 
-    async fn sched_yield(&mut self) -> Result<(), Error> {
+    async fn sched_yield(&self) -> Result<(), Error> {
         Snapshot1::sched_yield(self).await?;
         Ok(())
     }
 
     async fn random_get<'a>(
-        &mut self,
+        &self,
         buf: &GuestPtr<'a, u8>,
         buf_len: types::Size,
     ) -> Result<(), Error> {
@@ -1034,7 +1031,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn sock_recv<'a>(
-        &mut self,
+        &self,
         _fd: types::Fd,
         _ri_data: &types::IovecArray<'a>,
         _ri_flags: types::Riflags,
@@ -1043,7 +1040,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
     }
 
     async fn sock_send<'a>(
-        &mut self,
+        &self,
         _fd: types::Fd,
         _si_data: &types::CiovecArray<'a>,
         _si_flags: types::Siflags,
@@ -1051,7 +1048,7 @@ impl wasi_unstable::WasiUnstable for WasiCtx {
         Err(Error::trap(anyhow::Error::msg("sock_send unsupported")))
     }
 
-    async fn sock_shutdown(&mut self, _fd: types::Fd, _how: types::Sdflags) -> Result<(), Error> {
+    async fn sock_shutdown(&self, _fd: types::Fd, _how: types::Sdflags) -> Result<(), Error> {
         Err(Error::trap(anyhow::Error::msg("sock_shutdown unsupported")))
     }
 }
