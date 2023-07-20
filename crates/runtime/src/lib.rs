@@ -40,6 +40,7 @@ mod memory;
 mod mmap;
 mod mmap_vec;
 mod parking_spot;
+mod mpk;
 mod send_sync_ptr;
 mod store_box;
 mod table;
