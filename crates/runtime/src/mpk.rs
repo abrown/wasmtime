@@ -23,6 +23,7 @@
 //! - the `pkru` module controls the x86 `PKRU` register (and other CPU state)
 
 use anyhow::{Context, Result};
+use std::rc::Rc;
 
 /// Check if the MPK feature is supported.
 pub fn is_supported() -> bool {
@@ -49,6 +50,7 @@ pub fn is_supported() -> bool {
 /// Because MPK may not be available on all systems, [`Pkey`] wraps an `Option`
 /// that will always be `None` if MPK is not supported. The idea here is that
 /// the API can remain the same regardless of MPK support.
+#[derive(Debug)]
 pub struct Pkey(Option<u32>);
 
 impl Pkey {
@@ -64,6 +66,19 @@ impl Pkey {
             Ok(Self(Some(key_id)))
         } else {
             Ok(Self(None))
+        }
+    }
+
+    /// Convert the [`Pkey`] to its 0-based index; this is useful for
+    /// determining which allocation "stripe" a key belongs to.
+    ///
+    /// This function assumes that the kernel has allocated key 0 for itself.
+    pub fn as_stripe(&self) -> usize {
+        if let Some(key_id) = self.0 {
+            debug_assert!(key_id != 0);
+            key_id as usize - 1
+        } else {
+            0
         }
     }
 
@@ -88,7 +103,7 @@ impl Pkey {
     /// via Wasmtime's embedder API, e.g. TODO: what if keys have been allocated
     /// by other code? this would break their assumptions.
     pub fn deactivate(&self) {
-        if let Some(key_id) = self.0 {
+        if self.0.is_some() {
             pkru::write(pkru::ALLOW_ACCESS);
         }
     }
@@ -121,6 +136,26 @@ impl Drop for Pkey {
         if let Some(key_id) = self.0 {
             sys::pkey_free(key_id).expect("unable to drop pkey!")
         }
+    }
+}
+
+/// A ref-counted wrapper for [`Pkey`].
+///
+/// Because protection keys are kernel-allocated, we must ensure that they are
+/// only dropped once by the process using them. E.g., the keys must be shared
+/// between the pooling allocator (for `pkey_mprotect`-ing regions) and the
+/// stores that use them (to set the PKRU register); during testing, the keys
+/// must live as long as possible to avoid errors.
+#[derive(Clone, Debug)]
+pub struct PkeyRef(Rc<Pkey>);
+impl From<Pkey> for PkeyRef {
+    fn from(key: Pkey) -> Self {
+        Self(Rc::new(key))
+    }
+}
+impl AsRef<Pkey> for PkeyRef {
+    fn as_ref(&self) -> &Pkey {
+        self.0.as_ref()
     }
 }
 
@@ -181,6 +216,9 @@ mod sys {
     /// key ID.
     ///
     /// [docs]: https://man7.org/linux/man-pages/man2/pkey_alloc.2.html
+    ///
+    /// Each process has its own separate pkey index; e.g., if process `m`
+    /// allocates key 1, process `n` can as well.
     pub fn pkey_alloc(flags: u32, access_rights: u32) -> Result<u32> {
         debug_assert_eq!(flags, 0); // reserved for future use--must be 0.
         let result = unsafe { libc::syscall(libc::SYS_pkey_alloc, flags, access_rights) };
@@ -239,6 +277,7 @@ mod sys {
     #[cfg(test)]
     mod tests {
         use super::*;
+
         #[test]
         fn check_allocate_and_free() {
             let key = pkey_alloc(0, 0).unwrap();
