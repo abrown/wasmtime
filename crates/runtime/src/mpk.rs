@@ -23,7 +23,7 @@
 //! - the `pkru` module controls the x86 `PKRU` register (and other CPU state)
 
 use anyhow::{Context, Result};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Check if the MPK feature is supported.
 pub fn is_supported() -> bool {
@@ -147,10 +147,10 @@ impl Drop for Pkey {
 /// stores that use them (to set the PKRU register); during testing, the keys
 /// must live as long as possible to avoid errors.
 #[derive(Clone, Debug, PartialEq)]
-pub struct PkeyRef(Rc<Pkey>);
+pub struct PkeyRef(Arc<Pkey>);
 impl From<Pkey> for PkeyRef {
     fn from(key: Pkey) -> Self {
-        Self(Rc::new(key))
+        Self(Arc::new(key))
     }
 }
 impl AsRef<Pkey> for PkeyRef {
@@ -347,6 +347,7 @@ mod pkru {
     pub const DISABLE_ACCESS: u32 = 0b01010101_01010101_01010101_01010101;
 
     /// Read the value of the `PKRU` register.
+    #[cfg(test)]
     fn read() -> u32 {
         // ECX must be 0 to prevent a general protection exception (#GP).
         let ecx: u32 = 0;
@@ -380,6 +381,7 @@ mod pkru {
     /// Check that the `CR4.PKE` flag (bit 22) is set; see the Intel Software
     /// Development Manual, vol 3a, section 2.7. This register can only be
     /// accessed from privilege level 0.
+    #[cfg(test)]
     pub fn has_cr4_bit_set() -> bool {
         let cr4: u64;
         unsafe {
