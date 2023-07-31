@@ -50,7 +50,7 @@ pub fn is_supported() -> bool {
 /// Because MPK may not be available on all systems, [`Pkey`] wraps an `Option`
 /// that will always be `None` if MPK is not supported. The idea here is that
 /// the API can remain the same regardless of MPK support.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Pkey(Option<u32>);
 
 impl Pkey {
@@ -146,7 +146,7 @@ impl Drop for Pkey {
 /// between the pooling allocator (for `pkey_mprotect`-ing regions) and the
 /// stores that use them (to set the PKRU register); during testing, the keys
 /// must live as long as possible to avoid errors.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PkeyRef(Rc<Pkey>);
 impl From<Pkey> for PkeyRef {
     fn from(key: Pkey) -> Self {

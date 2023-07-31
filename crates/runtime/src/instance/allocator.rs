@@ -1,6 +1,7 @@
 use crate::imports::Imports;
 use crate::instance::{Instance, InstanceHandle, RuntimeMemoryCreator};
 use crate::memory::{DefaultMemoryCreator, Memory};
+use crate::mpk::PkeyRef;
 use crate::table::Table;
 use crate::{CompiledModuleId, ModuleRuntimeInfo, Store};
 use anyhow::{anyhow, bail, Result};
@@ -52,6 +53,11 @@ pub struct InstanceAllocationRequest<'a> {
     /// We use a number of `PhantomPinned` declarations to indicate this to the
     /// compiler. More info on this in `wasmtime/src/store.rs`
     pub store: StorePtr,
+
+    /// Request that the instance's memories be protected by a specific
+    /// protection key. TODO: is this necessary as a separate field or should we
+    /// use `store` and expose this in the `Store` trait?
+    pub pkey: Option<PkeyRef>,
 }
 
 /// A pointer to a Store. This Option<*mut dyn Store> is wrapped in a struct
@@ -103,8 +109,19 @@ pub unsafe trait InstanceAllocator {
     ///
     /// Note that the returned instance must still have `.initialize(..)` called
     /// on it to complete the instantiation process.
-    fn allocate(&self, mut req: InstanceAllocationRequest) -> Result<InstanceHandle> {
-        let index = self.allocate_index(&req)?;
+    fn allocate(
+        &self,
+        mut req: InstanceAllocationRequest,
+    ) -> Result<(InstanceHandle, Option<PkeyRef>)> {
+        let (index, pkey) = self.allocate_index(&req)?;
+        #[cfg(debug_assertions)]
+        if req.pkey.is_some() {
+            debug_assert_eq!(
+                req.pkey, pkey,
+                "the chosen pkey must match the request pkey"
+            );
+        }
+        req.pkey = pkey.clone();
         let module = req.runtime_info.module();
         let mut memories =
             PrimaryMap::with_capacity(module.memory_plans.len() - module.num_imported_memories);
@@ -121,7 +138,8 @@ pub unsafe trait InstanceAllocator {
             return Err(e);
         }
 
-        unsafe { Ok(Instance::new(req, index, memories, tables)) }
+        let instance = unsafe { Instance::new(req, index, memories, tables) };
+        Ok((instance, pkey))
     }
 
     /// Deallocates the provided instance.
@@ -145,7 +163,7 @@ pub unsafe trait InstanceAllocator {
     ///
     /// The return value here, if successful, is passed to the various methods
     /// below for memory/table allocation/deallocation.
-    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<usize>;
+    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<(usize, Option<PkeyRef>)>;
 
     /// Deallocates indices allocated by `allocate_index`.
     fn deallocate_index(&self, index: usize);
@@ -443,8 +461,8 @@ impl Default for OnDemandInstanceAllocator {
 }
 
 unsafe impl InstanceAllocator for OnDemandInstanceAllocator {
-    fn allocate_index(&self, _req: &InstanceAllocationRequest) -> Result<usize> {
-        Ok(0)
+    fn allocate_index(&self, _req: &InstanceAllocationRequest) -> Result<(usize, Option<PkeyRef>)> {
+        Ok((0, None))
     }
 
     fn deallocate_index(&self, index: usize) {

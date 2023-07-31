@@ -244,8 +244,8 @@ impl IndexAllocator {
         });
     }
 
-    /// For testing only, we want to be able to assert what is on the
-    /// single freelist, for the policies that keep just one.
+    /// For testing only, we want to be able to assert what is on the single
+    /// freelist, for the policies that keep just one.
     #[cfg(test)]
     pub(crate) fn testing_freelist(&self) -> Vec<SlotId> {
         let inner = self.0.lock().unwrap();
@@ -255,12 +255,19 @@ impl IndexAllocator {
             .collect()
     }
 
-    /// For testing only, get the list of all modules with at least
-    /// one slot with affinity for that module.
+    /// For testing only, get the list of all modules with at least one slot
+    /// with affinity for that module.
     #[cfg(test)]
     pub(crate) fn testing_module_affinity_list(&self) -> Vec<CompiledModuleId> {
         let inner = self.0.lock().unwrap();
         inner.module_affine.keys().copied().collect()
+    }
+
+    /// Return the number of empty slots available in this allocator.
+    pub fn num_empty_slots(&self) -> usize {
+        let inner = self.0.lock().unwrap();
+        let total_slots = inner.slot_state.len();
+        (total_slots - inner.last_cold as usize) + inner.unused_warm_slots as usize
     }
 }
 

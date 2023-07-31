@@ -6,6 +6,7 @@
 //! modules can be constrained based on configurable limits.
 
 use super::{InstanceAllocationRequest, InstanceAllocator};
+use crate::mpk::PkeyRef;
 use crate::{instance::Instance, Memory, Mmap, Table};
 use crate::{CompiledModuleId, MemoryImageSlot};
 use anyhow::{anyhow, bail, Context, Result};
@@ -126,13 +127,20 @@ struct MemoryPool {
     // The size, in bytes, of the offset to the first linear memory in this
     // pool. This is here to help account for the first region of guard pages,
     // if desired, before the first linear memory.
-    initial_memory_offset: usize,
+    pre_slab_guard_size: usize,
     max_memories: usize,
     max_instances: usize,
+    /// The number of stripes this memory pool is split into. This memory pool
+    /// is stripe-aware: if
+    num_stripes: usize,
 }
 
 impl MemoryPool {
-    fn new(instance_limits: &InstanceLimits, tunables: &Tunables) -> Result<Self> {
+    fn new(
+        instance_limits: &InstanceLimits,
+        tunables: &Tunables,
+        pkeys: &[PkeyRef],
+    ) -> Result<Self> {
         // The maximum module memory page count cannot exceed 65536 pages
         if instance_limits.memory_pages > 0x10000 {
             bail!(
@@ -152,19 +160,36 @@ impl MemoryPool {
             .max(tunables.static_memory_bound)
             * u64::from(WASM_PAGE_SIZE);
 
-        let memory_and_guard_size =
-            usize::try_from(memory_size + tunables.static_memory_offset_guard_size)
-                .map_err(|_| anyhow!("memory reservation size exceeds addressable memory"))?;
+        // Calculate the size of each memory.
+        let page_size = crate::page_size();
+        let memory_and_guard_size = if tunables.memory_protection_keys {
+            // If we are using memory protection keys, we can avoid allocating
+            // large, uncommitted ranges of guard pages. But we must
+            let minimum_mpk_memory_size = (8 << 30/* 8GB */) / pkeys.len();
+            let aligned_minimum_mpk_memory_size =
+                (minimum_mpk_memory_size + (page_size - 1)) & !(page_size - 1);
+            memory_size.max(aligned_minimum_mpk_memory_size as u64)
+        } else {
+            memory_size + tunables.static_memory_offset_guard_size
+        };
+        let memory_and_guard_size = usize::try_from(memory_and_guard_size)
+            .map_err(|_| anyhow!("memory reservation size exceeds addressable memory"))?;
 
         assert!(
-            memory_and_guard_size % crate::page_size() == 0,
+            memory_and_guard_size % page_size == 0,
             "memory size {} is not a multiple of system page size",
             memory_and_guard_size
         );
 
         let max_instances = instance_limits.count as usize;
         let max_memories = instance_limits.memories as usize;
-        let initial_memory_offset = if tunables.guard_before_linear_memory {
+        let pre_slab_guard_size =
+            if tunables.guard_before_linear_memory || tunables.memory_protection_keys {
+                usize::try_from(tunables.static_memory_offset_guard_size).unwrap()
+            } else {
+                0
+            };
+        let post_slab_guard_size = if tunables.memory_protection_keys {
             usize::try_from(tunables.static_memory_offset_guard_size).unwrap()
         } else {
             0
@@ -186,14 +211,29 @@ impl MemoryPool {
         let allocation_size = memory_and_guard_size
             .checked_mul(max_memories)
             .and_then(|c| c.checked_mul(max_instances))
-            .and_then(|c| c.checked_add(initial_memory_offset))
+            .and_then(|c| c.checked_add(pre_slab_guard_size))
+            .and_then(|c| c.checked_add(post_slab_guard_size))
             .ok_or_else(|| {
                 anyhow!("total size of memory reservation exceeds addressable memory")
             })?;
 
-        // Create a completely inaccessible region to start
-        let mapping = Mmap::accessible_reserved(0, allocation_size)
+        // Create a completely inaccessible region to start.
+        let mut mapping = Mmap::accessible_reserved(0, allocation_size)
             .context("failed to create memory pool mapping")?;
+
+        // Also, if we have memory protection keys, stripe the memory with
+        // sequential keys.
+        if tunables.memory_protection_keys {
+            let mut cursor = pre_slab_guard_size;
+            for i in 0..max_memories * max_instances {
+                debug_assert_eq!(i, (cursor - pre_slab_guard_size) / memory_and_guard_size);
+                let pkey = &pkeys[i % pkeys.len()];
+                let region = unsafe { mapping.slice_mut(cursor..cursor + memory_and_guard_size) };
+                pkey.as_ref().mark(region)?;
+                cursor += memory_and_guard_size;
+            }
+            debug_assert_eq!(cursor + post_slab_guard_size, allocation_size);
+        }
 
         let num_image_slots = max_instances * max_memories;
         let image_slots: Vec<_> = std::iter::repeat_with(|| Mutex::new(None))
@@ -205,10 +245,11 @@ impl MemoryPool {
             image_slots,
             memory_size: memory_size.try_into().unwrap(),
             memory_and_guard_size,
-            initial_memory_offset,
+            pre_slab_guard_size,
             max_memories,
             max_instances,
             max_accessible: (instance_limits.memory_pages as usize) * (WASM_PAGE_SIZE as usize),
+            num_stripes: pkeys.len().max(1),
         };
 
         Ok(pool)
@@ -216,11 +257,16 @@ impl MemoryPool {
 
     fn get_base(&self, instance_index: usize, memory_index: DefinedMemoryIndex) -> *mut u8 {
         assert!(instance_index < self.max_instances);
-        let memory_index = memory_index.as_u32() as usize;
-        assert!(memory_index < self.max_memories);
-        let idx = instance_index * self.max_memories + memory_index;
-        let offset = self.initial_memory_offset + idx * self.memory_and_guard_size;
+        let memory_index_ = memory_index.as_u32() as usize;
+        assert!(memory_index_ < self.max_memories);
+        let idx = self.get_index(instance_index, memory_index);
+        let offset = self.pre_slab_guard_size + idx * self.memory_and_guard_size;
         unsafe { self.mapping.as_ptr().offset(offset as isize).cast_mut() }
+    }
+
+    fn get_index(&self, instance_index: usize, memory_index: DefinedMemoryIndex) -> usize {
+        let memory_index = memory_index.as_u32() as usize;
+        instance_index * self.max_memories + memory_index * self.num_stripes
     }
 
     #[cfg(test)]
@@ -236,7 +282,7 @@ impl MemoryPool {
         instance_index: usize,
         memory_index: DefinedMemoryIndex,
     ) -> MemoryImageSlot {
-        let idx = instance_index * self.max_memories + (memory_index.as_u32() as usize);
+        let idx = self.get_index(instance_index, memory_index);
         let maybe_slot = self.image_slots[idx].lock().unwrap().take();
 
         maybe_slot.unwrap_or_else(|| {
@@ -256,7 +302,7 @@ impl MemoryPool {
         slot: MemoryImageSlot,
     ) {
         assert!(!slot.is_dirty());
-        let idx = instance_index * self.max_memories + (memory_index.as_u32() as usize);
+        let idx = self.get_index(instance_index, memory_index);
         *self.image_slots[idx].lock().unwrap() = Some(slot);
     }
 
@@ -570,16 +616,31 @@ impl Default for PoolingInstanceAllocatorConfig {
 pub struct PoolingInstanceAllocator {
     instance_size: usize,
     max_instances: usize,
-    index_allocator: IndexAllocator,
     memories: MemoryPool,
     tables: TablePool,
     linear_memory_keep_resident: usize,
     table_keep_resident: usize,
+    stripes: Vec<Stripe>,
 
     #[cfg(all(feature = "async", unix, not(miri)))]
     stacks: StackPool,
     #[cfg(all(feature = "async", windows))]
     stack_size: usize,
+}
+
+/// A set of allocator slots.
+///
+/// The allocated slots can be split by striping them: e.g., with two stripe
+/// colors 0 and 1, we would allocate all even slots using stripe 0 and all odd
+/// slots using stripe 1.
+///
+/// This is helpful for the use of protection keys: (a) if a request comes to
+/// allocate multiple instances, we can allocate them all from the same stripe
+/// and (b) if a store wants to allocate more from the same stripe it
+#[derive(Debug)]
+struct Stripe {
+    allocator: IndexAllocator,
+    pkey: PkeyRef,
 }
 
 impl PoolingInstanceAllocator {
@@ -591,14 +652,47 @@ impl PoolingInstanceAllocator {
 
         let max_instances = config.limits.count as usize;
 
+        let pkeys = {
+            let mut allocated = vec![];
+            while allocated.len() < max_instances {
+                if let Ok(pkey) = crate::mpk::Pkey::new() {
+                    debug_assert_eq!(pkey.as_stripe(), allocated.len());
+                    allocated.push(pkey.into());
+                } else {
+                    break;
+                }
+            }
+            allocated
+        };
+        let memories = MemoryPool::new(&config.limits, tunables, &pkeys)?;
+        let num_pkeys: u32 = pkeys.len().try_into().unwrap();
+        let num_full_stripes = config.limits.count / num_pkeys;
+        let num_partial_stripe_slots = config.limits.count % num_pkeys;
+        let stripes = pkeys
+            .into_iter()
+            .enumerate()
+            .map(|(i, pkey)| {
+                let extra_slot = if num_partial_stripe_slots > (i as u32) {
+                    1
+                } else {
+                    0
+                };
+                let allocator = IndexAllocator::new(
+                    num_full_stripes + extra_slot,
+                    config.max_unused_warm_slots,
+                );
+                Stripe { allocator, pkey }
+            })
+            .collect();
+
         Ok(Self {
             instance_size: round_up_to_pow2(config.limits.size, mem::align_of::<Instance>()),
             max_instances,
-            index_allocator: IndexAllocator::new(config.limits.count, config.max_unused_warm_slots),
-            memories: MemoryPool::new(&config.limits, tunables)?,
+            memories,
             tables: TablePool::new(&config.limits)?,
             linear_memory_keep_resident: config.linear_memory_keep_resident,
             table_keep_resident: config.table_keep_resident,
+            stripes,
             #[cfg(all(feature = "async", unix, not(miri)))]
             stacks: StackPool::new(config)?,
             #[cfg(all(feature = "async", windows))]
@@ -734,6 +828,32 @@ impl PoolingInstanceAllocator {
 
         bail!("{}", message)
     }
+
+    fn emptiest_stripe(&self) -> usize {
+        let (stripe_id, _) = self
+            .stripes
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, s)| s.allocator.num_empty_slots())
+            .expect("there must be at least one stripe");
+        stripe_id
+    }
+
+    /// For testing only, we want to be able to list what slots are free.
+    #[cfg(test)]
+    pub(crate) fn testing_freelist(&self) -> Vec<SlotId> {
+        self.stripes
+            .iter()
+            .enumerate()
+            .flat_map(|(id, s)| {
+                s.allocator
+                    .testing_freelist()
+                    .iter()
+                    .map(|s| SlotId(s.0 + id as u32))
+                    .collect::<Vec<_>>() // TODO multiply by num_stripes
+            })
+            .collect()
+    }
 }
 
 unsafe impl InstanceAllocator for PoolingInstanceAllocator {
@@ -745,8 +865,14 @@ unsafe impl InstanceAllocator for PoolingInstanceAllocator {
         Ok(())
     }
 
-    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<usize> {
-        self.index_allocator
+    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<(usize, Option<PkeyRef>)> {
+        let stripe_id = if let Some(pkey) = &req.pkey {
+            pkey.as_ref().as_stripe()
+        } else {
+            self.emptiest_stripe()
+        };
+        let stripe_index = self.stripes[stripe_id]
+            .allocator
             .alloc(req.runtime_info.unique_id())
             .map(|id| id.index())
             .ok_or_else(|| {
@@ -754,11 +880,18 @@ unsafe impl InstanceAllocator for PoolingInstanceAllocator {
                     "maximum concurrent instance limit of {} reached",
                     self.max_instances
                 )
-            })
+            })?;
+        let index = stripe_index * self.stripes.len() + stripe_id;
+        let pkey = Some(self.stripes[stripe_id].pkey.clone());
+        Ok((index, pkey))
     }
 
     fn deallocate_index(&self, index: usize) {
-        self.index_allocator.free(SlotId(index as u32));
+        let stripe_id = index % self.stripes.len();
+        let stripe_index = index / self.stripes.len();
+        self.stripes[stripe_id]
+            .allocator
+            .free(SlotId(stripe_index as u32));
     }
 
     fn allocate_memories(
@@ -851,6 +984,10 @@ unsafe impl InstanceAllocator for PoolingInstanceAllocator {
         req: &mut InstanceAllocationRequest,
         tables: &mut PrimaryMap<DefinedTableIndex, Table>,
     ) -> Result<()> {
+        // We do not stripe the tables and therefore have to "undo" the striping
+        // effects of the index allocators
+        let index = index / self.stripes.len(); // + index % self.stripes.len();
+
         let module = req.runtime_info.module();
 
         self.validate_table_plans(module)?;
@@ -940,9 +1077,12 @@ unsafe impl InstanceAllocator for PoolingInstanceAllocator {
         // allocated further (the module is being dropped) so this shouldn't hit
         // any sort of infinite loop since this should be the final operation
         // working with `module`.
-        while let Some(index) = self.index_allocator.alloc_affine_and_clear_affinity(module) {
-            self.memories.clear_images(index.index());
-            self.index_allocator.free(index);
+        for stripe in &self.stripes {
+            while let Some(index) = stripe.allocator.alloc_affine_and_clear_affinity(module) {
+                self.memories
+                    .clear_images(index.index() * self.stripes.len());
+                stripe.allocator.free(index);
+            }
         }
     }
 }
@@ -1037,7 +1177,7 @@ mod test {
         assert_eq!(instances.instance_size, 1008); // round 1000 up to alignment
         assert_eq!(instances.max_instances, 3);
 
-        assert_eq!(instances.index_allocator.testing_freelist(), []);
+        assert_eq!(instances.testing_freelist(), []);
 
         let mut handles = Vec::new();
         let module = Arc::new(Module::default());
@@ -1055,13 +1195,15 @@ mod test {
                         },
                         host_state: Box::new(()),
                         store: StorePtr::empty(),
+                        pkey: None,
                     })
                     .expect("allocation should succeed"),
             );
         }
 
-        assert_eq!(instances.index_allocator.testing_freelist(), []);
+        assert_eq!(instances.testing_freelist(), []);
 
+        // We should not be able to allocate any more instances.
         match instances.allocate(InstanceAllocationRequest {
             runtime_info: &empty_runtime_info(module),
             imports: Imports {
@@ -1072,17 +1214,21 @@ mod test {
             },
             host_state: Box::new(()),
             store: StorePtr::empty(),
+            pkey: None,
         }) {
             Err(_) => {}
-            _ => panic!("unexpected error"),
+            Ok(handle) => {
+                println!("{:?}", handle.1);
+                panic!("unexpected error");
+            }
         };
 
-        for mut handle in handles.drain(..) {
+        for (mut handle, _) in handles.drain(..) {
             instances.deallocate(&mut handle);
         }
 
         assert_eq!(
-            instances.index_allocator.testing_freelist(),
+            instances.testing_freelist(),
             [SlotId(0), SlotId(1), SlotId(2)]
         );
 
@@ -1106,6 +1252,7 @@ mod test {
                 static_memory_offset_guard_size: 0,
                 ..Tunables::default()
             },
+            &[],
         )?;
 
         assert_eq!(pool.memory_and_guard_size, WASM_PAGE_SIZE as usize);
