@@ -38,7 +38,8 @@ pub struct InstanceAllocationRequest<'a> {
 
     /// A pointer to the "store" for this instance to be allocated. The store
     /// correlates with the `Store` in wasmtime itself, and lots of contextual
-    /// information about the execution of wasm can be learned through the store.
+    /// information about the execution of wasm can be learned through the
+    /// store.
     ///
     /// Note that this is a raw pointer and has a static lifetime, both of which
     /// are a bit of a lie. This is done purely so a store can learn about

@@ -1,11 +1,9 @@
 //! Implements the pooling instance allocator.
 //!
-//! The pooling instance allocator maps memory in advance
-//! and allocates instances, memories, tables, and stacks from
-//! a pool of available resources.
-//!
-//! Using the pooling instance allocator can speed up module instantiation
-//! when modules can be constrained based on configurable limits.
+//! The pooling instance allocator maps memory in advance and allocates
+//! instances, memories, tables, and stacks from a pool of available resources.
+//! Using the pooling instance allocator can speed up module instantiation when
+//! modules can be constrained based on configurable limits.
 
 use super::{InstanceAllocationRequest, InstanceAllocator};
 use crate::{instance::Instance, Memory, Mmap, Table};
