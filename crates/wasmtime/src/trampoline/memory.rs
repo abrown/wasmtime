@@ -10,6 +10,7 @@ use wasmtime_environ::{
     DefinedMemoryIndex, DefinedTableIndex, EntityIndex, MemoryPlan, MemoryStyle, Module,
     PrimaryMap, WASM_PAGE_SIZE,
 };
+use wasmtime_runtime::mpk::PkeyRef;
 use wasmtime_runtime::{
     CompiledModuleId, Imports, InstanceAllocationRequest, InstanceAllocator, Memory, MemoryImage,
     OnDemandInstanceAllocator, RuntimeLinearMemory, RuntimeMemoryCreator, SharedMemory, StorePtr,
@@ -56,10 +57,11 @@ pub fn create_memory(
         host_state,
         store: StorePtr::new(store.traitobj()),
         runtime_info,
+        pkey: None,
     };
 
     unsafe {
-        let handle = SingleMemoryInstance {
+        let (handle, _) = SingleMemoryInstance {
             preallocation,
             ondemand: OnDemandInstanceAllocator::default(),
         }
@@ -143,7 +145,7 @@ struct SingleMemoryInstance<'a> {
 }
 
 unsafe impl InstanceAllocator for SingleMemoryInstance<'_> {
-    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<usize> {
+    fn allocate_index(&self, req: &InstanceAllocationRequest) -> Result<(usize, Option<PkeyRef>)> {
         self.ondemand.allocate_index(req)
     }
 

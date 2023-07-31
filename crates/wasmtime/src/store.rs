@@ -94,7 +94,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use wasmtime_runtime::{
-    InstanceAllocationRequest, InstanceAllocator, InstanceHandle, ModuleInfo,
+    mpk::PkeyRef, InstanceAllocationRequest, InstanceAllocator, InstanceHandle, ModuleInfo,
     OnDemandInstanceAllocator, SignalHandler, StoreBox, StorePtr, VMContext, VMExternRef,
     VMExternRefActivationsTable, VMFuncRef, VMRuntimeLimits, WasmFault,
 };
@@ -338,6 +338,11 @@ pub struct StoreOpaque {
     /// Note that this is `ManuallyDrop` as it must be dropped after
     /// `store_data` above, where the function pointers are stored.
     rooted_host_funcs: ManuallyDrop<Vec<Arc<[Definition]>>>,
+
+    /// Keep track of what protection key is being used during allocation so
+    /// that the right memory pages can be enabled when entering WebAssembly
+    /// guest code.
+    pkey: Option<PkeyRef>,
 }
 
 #[cfg(feature = "async")]
@@ -474,6 +479,7 @@ impl<T> Store<T> {
                 hostcall_val_storage: Vec::new(),
                 wasm_val_raw_storage: Vec::new(),
                 rooted_host_funcs: ManuallyDrop::new(Vec::new()),
+                pkey: None,
             },
             limiter: None,
             call_hook: None,
@@ -491,12 +497,13 @@ impl<T> Store<T> {
         inner.default_caller = {
             let module = Arc::new(wasmtime_environ::Module::default());
             let shim = BareModuleInfo::empty(module).into_traitobj();
-            let mut instance = OnDemandInstanceAllocator::default()
+            let (mut instance, _) = OnDemandInstanceAllocator::default()
                 .allocate(InstanceAllocationRequest {
                     host_state: Box::new(()),
                     imports: Default::default(),
                     store: StorePtr::empty(),
                     runtime_info: &shim,
+                    pkey: None,
                 })
                 .expect("failed to allocate default callee");
 
@@ -1123,6 +1130,13 @@ impl<T> StoreInner<T> {
     }
 
     pub fn call_hook(&mut self, s: CallHook) -> Result<()> {
+        if let Some(pkey) = &self.inner.pkey {
+            match s {
+                CallHook::CallingWasm | CallHook::ReturningFromHost => pkey.as_ref().activate(),
+                CallHook::ReturningFromWasm | CallHook::CallingHost => pkey.as_ref().deactivate(),
+            }
+        }
+
         match &mut self.call_hook {
             Some(CallHookInner::Sync(hook)) => hook(&mut self.data, s),
 
@@ -1535,6 +1549,19 @@ at https://bytecodealliance.org/security.
 "
         );
         std::process::abort();
+    }
+
+    /// Retrieve the store's protection key.
+    #[inline]
+    pub(crate) fn get_pkey(&self) -> Option<PkeyRef> {
+        self.pkey.clone()
+    }
+
+    /// Set the store's protection key.
+    #[inline]
+    pub(crate) fn set_pkey(&mut self, pkey: Option<PkeyRef>) {
+        assert!(self.pkey.is_some() && pkey == self.pkey);
+        self.pkey = pkey;
     }
 }
 

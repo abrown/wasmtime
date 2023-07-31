@@ -265,7 +265,7 @@ impl Instance {
         // it's the same later when we do actually insert it.
         let instance_to_be = store.store_data().next_id::<InstanceData>();
 
-        let mut instance_handle =
+        let (mut instance_handle, pkey) =
             store
                 .engine()
                 .allocator()
@@ -274,7 +274,11 @@ impl Instance {
                     imports,
                     host_state: Box::new(Instance(instance_to_be)),
                     store: StorePtr::new(store.traitobj()),
+                    pkey: store.get_pkey(),
                 })?;
+
+        // TODO
+        store.set_pkey(pkey);
 
         // The instance still has lots of setup, for example
         // data/elements/start/etc. This can all fail, but even on failure
