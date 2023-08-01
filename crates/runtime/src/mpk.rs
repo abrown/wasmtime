@@ -9,7 +9,7 @@
 //! memory allocations, allowing it to avoid guard pages in some cases and more
 //! efficiently use memory. This technique was first presented in a 2022 paper:
 //! [Segue and ColorGuard: Optimizing SFI Performance and Scalability on Modern
-//! x86][paper].
+//! x86][colorguard].
 //!
 //! [pooling allocator]: TODO
 //! [Linux documentation]:
