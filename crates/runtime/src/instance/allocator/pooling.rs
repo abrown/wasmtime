@@ -60,7 +60,7 @@
 //!
 
 use super::{InstanceAllocationRequest, InstanceAllocator};
-use crate::mpk::PkeyRef;
+use crate::mpk::{self, PkeyRef};
 use crate::{instance::Instance, Memory, Mmap, Table};
 use crate::{CompiledModuleId, MemoryImageSlot};
 use anyhow::{anyhow, bail, Context, Result};
@@ -706,18 +706,8 @@ impl PoolingInstanceAllocator {
 
         let max_instances = config.limits.count as usize;
 
-        let pkeys = {
-            let mut allocated = vec![];
-            while allocated.len() < max_instances {
-                if let Ok(pkey) = crate::mpk::Pkey::new() {
-                    debug_assert_eq!(pkey.as_stripe(), allocated.len());
-                    allocated.push(pkey.into());
-                } else {
-                    break;
-                }
-            }
-            allocated
-        };
+        let pkeys = mpk::keys();
+        let pkeys = pkeys[..max_instances.min(pkeys.len())].to_vec();
         let memories = MemoryPool::new(&config.limits, tunables, &pkeys)?;
         let num_pkeys: u32 = pkeys.len().try_into().unwrap();
         let num_full_stripes = config.limits.count / num_pkeys;

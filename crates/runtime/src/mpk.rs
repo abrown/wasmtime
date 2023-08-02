@@ -11,7 +11,7 @@
 //! [Segue and ColorGuard: Optimizing SFI Performance and Scalability on Modern
 //! x86][colorguard].
 //!
-//! [pooling allocator]: TODO
+//! [pooling allocator]: crate::PoolingInstanceAllocator
 //! [Linux documentation]:
 //!     https://www.kernel.org/doc/html/latest/core-api/protection-keys.html
 //! [colorguard]: https://plas2022.github.io/files/pdf/SegueColorGuard.pdf
@@ -23,13 +23,33 @@
 //! - the `pkru` module controls the x86 `PKRU` register (and other CPU state)
 
 use anyhow::{Context, Result};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Check if the MPK feature is supported.
 pub fn is_supported() -> bool {
     cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") && pkru::has_cpuid_bit_set()
     // TODO: we cannot check CR4 due to privilege
 }
+
+/// Allocate all protection keys available to this process.
+///
+/// This asks the kernel for all available keys (we expect 1-15; 0 is
+/// kernel-reserved) in a thread-safe way. This avoids interference when
+/// multiple threads try to allocate keys at the same time (e.g., during
+/// testing). It also ensures that a single copy of the keys are reserved for
+/// the lifetime of the process.
+pub fn keys() -> &'static [PkeyRef] {
+    let keys = KEYS.get_or_init(|| {
+        let mut allocated = vec![];
+        while let Ok(pkey) = Pkey::new() {
+            debug_assert_eq!(pkey.as_stripe(), allocated.len());
+            allocated.push(pkey.into());
+        }
+        allocated
+    });
+    &keys
+}
+static KEYS: OnceLock<Vec<PkeyRef>> = OnceLock::new();
 
 /// An MPK protection key.
 ///
@@ -168,11 +188,13 @@ mod tests {
         println!("is pku supported = {}", is_supported());
     }
 
+    #[ignore = "cannot be run when keys() has already allocated all keys"]
     #[test]
     fn check_constructing_new_pkey() {
         Pkey::new().unwrap();
     }
 
+    #[ignore = "cannot be run when keys() has already allocated all keys"]
     #[test]
     fn check_invalid_mark() {
         let pkey = Pkey::new().unwrap();
@@ -278,6 +300,7 @@ mod sys {
     mod tests {
         use super::*;
 
+        #[ignore = "cannot be run when keys() has already allocated all keys"]
         #[test]
         fn check_allocate_and_free() {
             let key = pkey_alloc(0, 0).unwrap();
