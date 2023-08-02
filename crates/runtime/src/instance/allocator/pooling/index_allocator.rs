@@ -424,7 +424,9 @@ mod test {
     fn test_next_available_allocation_strategy() {
         for size in 0..20 {
             let state = IndexAllocator::new(size, 0);
+            assert_eq!(state.num_empty_slots() as u32, size);
             for i in 0..size {
+                assert_eq!(state.num_empty_slots() as u32, size - i);
                 assert_eq!(state.alloc(None).unwrap().index(), i as usize);
             }
             assert!(state.alloc(None).is_none());
@@ -445,10 +447,12 @@ mod test {
         assert_ne!(index1, index2);
 
         state.free(index1);
+        assert_eq!(state.num_empty_slots(), 99);
+
+        // Allocate to the same `index1` slot again.
         let index3 = state.alloc(Some(id1)).unwrap();
         assert_eq!(index3, index1);
         state.free(index3);
-
         state.free(index2);
 
         // Both id1 and id2 should have some slots with affinity.
@@ -461,13 +465,14 @@ mod test {
         // for id1, and 98 empty. Allocate 100 for id2. The first
         // should be equal to the one we know was previously used for
         // id2. The next 99 are arbitrary.
-
+        assert_eq!(state.num_empty_slots(), 100);
         let mut indices = vec![];
         for _ in 0..100 {
             indices.push(state.alloc(Some(id2)).unwrap());
         }
         assert!(state.alloc(None).is_none());
         assert_eq!(indices[0], index2);
+        assert_eq!(state.num_empty_slots(), 0);
 
         for i in indices {
             state.free(i);
