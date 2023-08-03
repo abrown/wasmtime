@@ -1560,7 +1560,7 @@ at https://bytecodealliance.org/security.
     /// Set the store's protection key.
     #[inline]
     pub(crate) fn set_pkey(&mut self, pkey: Option<PkeyRef>) {
-        assert!(self.pkey.is_some() && pkey == self.pkey);
+        assert!(self.pkey.is_none() || pkey == self.pkey);
         self.pkey = pkey;
     }
 }

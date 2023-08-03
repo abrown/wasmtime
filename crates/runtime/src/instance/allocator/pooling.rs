@@ -216,9 +216,12 @@ impl MemoryPool {
 
         // Calculate the size of each memory.
         let page_size = crate::page_size();
-        let memory_and_guard_size = if tunables.memory_protection_keys {
+        let use_protection_keys = !pkeys.is_empty();
+        let memory_and_guard_size = if use_protection_keys {
             // If we are using memory protection keys, we can avoid allocating
-            // large, uncommitted ranges of guard pages. But we must
+            // large, uncommitted ranges of guard pages. But we must ensure that
+            // the linear memory between the same use of a protection key adds
+            // up to 8GB.
             let minimum_mpk_memory_size = (8 << 30/* 8GB */) / pkeys.len();
             let aligned_minimum_mpk_memory_size =
                 (minimum_mpk_memory_size + (page_size - 1)) & !(page_size - 1);
@@ -237,13 +240,12 @@ impl MemoryPool {
 
         let max_instances = instance_limits.count as usize;
         let max_memories = instance_limits.memories as usize;
-        let pre_slab_guard_size =
-            if tunables.guard_before_linear_memory || tunables.memory_protection_keys {
-                usize::try_from(tunables.static_memory_offset_guard_size).unwrap()
-            } else {
-                0
-            };
-        let post_slab_guard_size = if tunables.memory_protection_keys {
+        let pre_slab_guard_size = if tunables.guard_before_linear_memory || use_protection_keys {
+            usize::try_from(tunables.static_memory_offset_guard_size).unwrap()
+        } else {
+            0
+        };
+        let post_slab_guard_size = if use_protection_keys {
             usize::try_from(tunables.static_memory_offset_guard_size).unwrap()
         } else {
             0
@@ -277,7 +279,7 @@ impl MemoryPool {
 
         // Also, if we have memory protection keys, stripe the memory with
         // sequential keys.
-        if tunables.memory_protection_keys {
+        if use_protection_keys {
             let mut cursor = pre_slab_guard_size;
             for i in 0..max_memories * max_instances {
                 debug_assert_eq!(i, (cursor - pre_slab_guard_size) / memory_and_guard_size);
@@ -645,6 +647,8 @@ pub struct PoolingInstanceAllocatorConfig {
     pub linear_memory_keep_resident: usize,
     /// Same as `linear_memory_keep_resident` but for tables.
     pub table_keep_resident: usize,
+    /// Whether to enable memory protection keys.
+    pub memory_protection_keys: AutoEnabled,
 }
 
 impl Default for PoolingInstanceAllocatorConfig {
@@ -657,15 +661,30 @@ impl Default for PoolingInstanceAllocatorConfig {
             async_stack_keep_resident: 0,
             linear_memory_keep_resident: 0,
             table_keep_resident: 0,
+            memory_protection_keys: AutoEnabled::Auto,
         }
     }
 }
 
+/// Describe the tri-state configuration of memory protection keys (MPK).
+#[derive(Clone, Copy, Debug)]
+pub enum AutoEnabled {
+    /// Use MPK if supported by the current system; fall back to guard regions
+    /// otherwise.
+    Auto,
+    /// Use MPK or fail if not supported.
+    Enable,
+    /// Do not use MPK.
+    Disable,
+}
+
 /// Implements the pooling instance allocator.
 ///
-/// This allocator internally maintains pools of instances, memories, tables, and stacks.
+/// This allocator internally maintains pools of instances, memories, tables,
+/// and stacks.
 ///
-/// Note: the resource pools are manually dropped so that the fault handler terminates correctly.
+/// Note: the resource pools are manually dropped so that the fault handler
+/// terminates correctly.
 #[derive(Debug)]
 pub struct PoolingInstanceAllocator {
     instance_size: usize,
@@ -706,7 +725,23 @@ impl PoolingInstanceAllocator {
 
         let max_instances = config.limits.count as usize;
 
-        let pkeys = mpk::keys();
+        let pkeys = match config.memory_protection_keys {
+            AutoEnabled::Auto => {
+                if mpk::is_supported() {
+                    mpk::keys()
+                } else {
+                    &[]
+                }
+            }
+            AutoEnabled::Enable => {
+                if mpk::is_supported() {
+                    mpk::keys()
+                } else {
+                    bail!("mpk is disabled on this system")
+                }
+            }
+            AutoEnabled::Disable => &[],
+        };
         let pkeys = pkeys[..max_instances.min(pkeys.len())].to_vec();
         let memories = MemoryPool::new(&config.limits, tunables, &pkeys)?;
         let num_pkeys: u32 = pkeys.len().try_into().unwrap();

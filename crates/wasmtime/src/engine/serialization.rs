@@ -325,9 +325,6 @@ impl Metadata {
 
             // Just a debugging aid, doesn't affect functionality at all.
             debug_adapter_modules: _,
-
-            // TODO
-            memory_protection_keys: _,
         } = self.tunables;
 
         Self::check_int(

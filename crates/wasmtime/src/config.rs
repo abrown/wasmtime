@@ -1806,7 +1806,7 @@ impl PoolingAllocationConfig {
     /// allocator additionally track an "affinity" flag to a particular core
     /// wasm module. When a module is instantiated into a slot then the slot is
     /// considered affine to that module, even after the instance has been
-    /// dealloocated.
+    /// deallocated.
     ///
     /// When a new instance is created then a slot must be chosen, and the
     /// current algorithm for selecting a slot is:
@@ -1829,7 +1829,7 @@ impl PoolingAllocationConfig {
     /// impact of "unused slots" for a long-running wasm server.
     ///
     /// If this setting is set to 0, for example, then affine slots are
-    /// aggressively resused on a least-recently-used basis. A "cold" slot is
+    /// aggressively reused on a least-recently-used basis. A "cold" slot is
     /// only used if there are no affine slots available to allocate from. This
     /// means that the set of slots used over the lifetime of a program is the
     /// same as the maximum concurrent number of wasm instances.
@@ -2046,6 +2046,34 @@ impl PoolingAllocationConfig {
     /// exceed the configured static memory maximum size.
     pub fn instance_memory_pages(&mut self, pages: u64) -> &mut Self {
         self.config.limits.memory_pages = pages;
+        self
+    }
+
+    /// Configures whether memory protection keys (MPK) should be used for more
+    /// efficient layout of pool-allocated memories.
+    ///
+    /// When using the pooling allocator (see [`Config::allocation_strategy`],
+    /// [`InstanceAllocationStrategy::Pooling`]), memory protection keys can
+    /// reduce the total amount of allocated memory by eliminating guard regions
+    /// between WebAssembly memories in the pool. It does so by "coloring"
+    /// memory regions with different memory keys and setting which regions are
+    /// accessible each time executions switches from host to guest (or vice
+    /// versa).
+    ///
+    /// MPK is only available on Linux (called `pku` there) and recent x86
+    /// systems. Checking for support at runtime is possible with
+    /// [`mpk::is_supported`][wasmtime_runtime::mpk::is_supported]. This
+    /// configuration setting can be in three states:
+    ///
+    /// - `auto`: if MPK support is available the guard regions are removed; if
+    ///   not, the guard regions remain
+    /// - `enable`: use MPK to eliminate guard regions; fail if MPK is not
+    ///   supported
+    /// - `disable`: never use MPK
+    ///
+    /// By default this value is `auto`.
+    pub fn memory_protection_keys(&mut self, enable: wasmtime_runtime::AutoEnabled) -> &mut Self {
+        self.config.memory_protection_keys = enable;
         self
     }
 }
