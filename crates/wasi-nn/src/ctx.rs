@@ -1,33 +1,50 @@
 //! Implements the host state for the `wasi-nn` API: [WasiNnCtx].
 
-use crate::backend::{
-    self, Backend, BackendError, BackendExecutionContext, BackendGraph, BackendKind,
-};
+use crate::backend::{Backend, BackendError, BackendExecutionContext, BackendGraph, BackendKind};
 use crate::types::GraphEncoding;
+use crate::{GraphRegistry, InMemoryRegistry};
+use anyhow::anyhow;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::path::Path;
 use thiserror::Error;
 use wiggle::GuestError;
 
+type Backends = HashMap<BackendKind, Box<dyn Backend>>;
+type Registry = Box<dyn GraphRegistry>;
 type GraphId = u32;
 type GraphExecutionContextId = u32;
 
+/// Construct an in-memory registry from the available backends and a list of
+/// `(<backend name>, <model directory>)`. This assumes models can be loaded
+/// from a local directory, which is a safe assumption currently for the current
+/// model types.
+pub fn preload(preload_graphs: &[(String, String)]) -> anyhow::Result<(Backends, Registry)> {
+    let mut backends: HashMap<_, _> = crate::backend::list().into_iter().collect();
+    let mut registry = InMemoryRegistry::new();
+    for (kind, path) in preload_graphs {
+        let backend = backends
+            .get_mut(&kind.parse()?)
+            .ok_or(anyhow!("unsupported backend: {}", kind))?;
+        registry.load(backend, Path::new(path))?;
+    }
+    Ok((backends, Box::new(registry)))
+}
+
 /// Capture the state necessary for calling into the backend ML libraries.
 pub struct WasiNnCtx {
-    pub(crate) backends: HashMap<BackendKind, Box<dyn Backend>>,
+    pub(crate) backends: Backends,
+    pub(crate) registry: Registry,
     pub(crate) graphs: Table<GraphId, Box<dyn BackendGraph>>,
     pub(crate) executions: Table<GraphExecutionContextId, Box<dyn BackendExecutionContext>>,
 }
 
 impl WasiNnCtx {
     /// Make a new context from the default state.
-    pub fn new() -> WasiNnResult<Self> {
-        let mut backends = HashMap::new();
-        for (kind, backend) in backend::list() {
-            backends.insert(kind, backend);
-        }
+    pub fn new(backends: Backends, registry: Registry) -> WasiNnResult<Self> {
         Ok(Self {
             backends,
+            registry,
             graphs: Table::default(),
             executions: Table::default(),
         })
@@ -102,9 +119,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::InMemoryRegistry;
 
     #[test]
     fn instantiate() {
-        WasiNnCtx::new().unwrap();
+        WasiNnCtx::new(HashMap::new(), Box::new(InMemoryRegistry::new())).unwrap();
     }
 }

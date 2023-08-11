@@ -42,6 +42,14 @@ fn parse_map_dirs(s: &str) -> Result<(String, String)> {
     Ok((parts[0].into(), parts[1].into()))
 }
 
+fn parse_graphs(s: &str) -> Result<(String, String)> {
+    let parts: Vec<&str> = s.split("::").collect();
+    if parts.len() != 2 {
+        bail!("must contain exactly one double colon ('::')");
+    }
+    Ok((parts[0].into(), parts[1].into()))
+}
+
 fn parse_dur(s: &str) -> Result<Duration> {
     // assume an integer without a unit specified is a number of seconds ...
     if let Ok(val) = s.parse() {
@@ -148,6 +156,10 @@ pub struct RunCommand {
     /// Grant access to a guest directory mapped as a host directory
     #[clap(long = "mapdir", number_of_values = 1, value_name = "GUEST_DIR::HOST_DIR", value_parser = parse_map_dirs)]
     map_dirs: Vec<(String, String)>,
+
+    /// Graphs
+    #[clap(long, value_name = "FORMAT::HOST_DIR", value_parser = parse_graphs)]
+    graphs: Vec<(String, String)>,
 
     /// Load the given WebAssembly module before the main module
     #[clap(
@@ -294,6 +306,7 @@ impl RunCommand {
             &self.common.wasi_modules.unwrap_or(WasiModules::default()),
             self.listenfd,
             preopen_sockets,
+            &self.graphs,
         )?;
 
         let mut limits = StoreLimitsBuilder::new();
@@ -681,6 +694,7 @@ fn populate_with_wasi(
     wasi_modules: &WasiModules,
     listenfd: bool,
     mut tcplisten: Vec<TcpListener>,
+    preload_graphs: &[(String, String)],
 ) -> Result<()> {
     if wasi_modules.wasi_common {
         wasmtime_wasi::add_to_linker(linker, |host| host.wasi.as_mut().unwrap())?;
@@ -733,7 +747,8 @@ fn populate_with_wasi(
                 Arc::get_mut(host.wasi_nn.as_mut().unwrap())
                     .expect("wasi-nn is not implemented with multi-threading support")
             })?;
-            store.data_mut().wasi_nn = Some(Arc::new(WasiNnCtx::new()?));
+            let (backends, registry) = wasmtime_wasi_nn::preload(preload_graphs)?;
+            store.data_mut().wasi_nn = Some(Arc::new(WasiNnCtx::new(backends, registry)?));
         }
     }
 

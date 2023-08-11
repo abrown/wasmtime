@@ -3,7 +3,7 @@
 use super::{Backend, BackendError, BackendExecutionContext, BackendGraph};
 use crate::types::{ExecutionTarget, Tensor, TensorType};
 use openvino::{InferenceError, Layout, Precision, SetupError, TensorDesc};
-use std::sync::Arc;
+use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 #[derive(Default)]
 pub(crate) struct OpenvinoBackend(Option<openvino::Core>);
@@ -56,6 +56,17 @@ impl Backend for OpenvinoBackend {
             core.load_network(&cnn_network, map_execution_target_to_string(target))?;
 
         Ok(Box::new(OpenvinoGraph(Arc::new(cnn_network), exec_network)))
+    }
+
+    fn load_from_dir(
+        &mut self,
+        path: &Path,
+        target: ExecutionTarget,
+    ) -> Result<Box<dyn BackendGraph>, BackendError> {
+        let model = read(&path.join("model.xml"))?;
+        let weights = read(&path.join("model.bin"))?;
+        let graph = self.load(&[&model, &weights], target)?;
+        Ok(graph)
     }
 }
 
@@ -141,4 +152,13 @@ fn map_tensor_type_to_precision(tensor_type: TensorType) -> openvino::Precision 
         TensorType::U8 => Precision::U8,
         TensorType::I32 => Precision::I32,
     }
+}
+
+/// Read a file into a byte vector.
+fn read(path: &Path) -> anyhow::Result<Vec<u8>> {
+    let mut file = File::open(path)?;
+    let file_size = file.metadata()?.len();
+    let mut buffer = vec![0; file_size as usize];
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
 }

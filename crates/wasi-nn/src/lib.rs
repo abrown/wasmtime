@@ -1,7 +1,10 @@
-mod backend;
 mod ctx;
+mod registry;
 
-pub use ctx::WasiNnCtx;
+pub use ctx::{preload, WasiNnCtx};
+pub use registry::{GraphRegistry, InMemoryRegistry};
+
+pub mod backend;
 pub mod types;
 #[cfg(feature = "component-model")]
 pub mod wit;

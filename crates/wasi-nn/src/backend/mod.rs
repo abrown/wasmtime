@@ -6,33 +6,39 @@ mod openvino;
 
 use self::openvino::OpenvinoBackend;
 use crate::types::{ExecutionTarget, Tensor};
+use std::{error::Error, fmt, path::Path, str::FromStr};
 use thiserror::Error;
 use wiggle::GuestError;
 
 /// Return a list of all available backend frameworks.
-pub(crate) fn list() -> Vec<(BackendKind, Box<dyn Backend>)> {
+pub fn list() -> Vec<(BackendKind, Box<dyn Backend>)> {
     vec![(BackendKind::OpenVINO, Box::new(OpenvinoBackend::default()))]
 }
 
 /// A [Backend] contains the necessary state to load [BackendGraph]s.
-pub(crate) trait Backend: Send + Sync {
+pub trait Backend: Send + Sync {
     fn name(&self) -> &str;
     fn load(
         &mut self,
         builders: &[&[u8]],
         target: ExecutionTarget,
     ) -> Result<Box<dyn BackendGraph>, BackendError>;
+    fn load_from_dir(
+        &mut self,
+        path: &Path,
+        target: ExecutionTarget,
+    ) -> Result<Box<dyn BackendGraph>, BackendError>;
 }
 
 /// A [BackendGraph] can create [BackendExecutionContext]s; this is the backing
 /// implementation for a [crate::witx::types::Graph].
-pub(crate) trait BackendGraph: Send + Sync {
+pub trait BackendGraph: Send + Sync {
     fn init_execution_context(&mut self) -> Result<Box<dyn BackendExecutionContext>, BackendError>;
 }
 
 /// A [BackendExecutionContext] performs the actual inference; this is the
 /// backing implementation for a [crate::witx::types::GraphExecutionContext].
-pub(crate) trait BackendExecutionContext: Send + Sync {
+pub trait BackendExecutionContext: Send + Sync {
     fn set_input(&mut self, index: u32, tensor: &Tensor<'_>) -> Result<(), BackendError>;
     fn compute(&mut self) -> Result<(), BackendError>;
     fn get_output(&mut self, index: u32, destination: &mut [u8]) -> Result<u32, BackendError>;
@@ -52,8 +58,8 @@ pub enum BackendError {
     NotEnoughMemory(usize),
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
-pub(crate) enum BackendKind {
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Copy)]
+pub enum BackendKind {
     OpenVINO,
 }
 impl From<u8> for BackendKind {
@@ -64,3 +70,21 @@ impl From<u8> for BackendKind {
         }
     }
 }
+impl FromStr for BackendKind {
+    type Err = BackendKindParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "openvino" => Ok(BackendKind::OpenVINO),
+            _ => Err(BackendKindParseError(s.into())),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct BackendKindParseError(String);
+impl fmt::Display for BackendKindParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown backend: {}", self.0)
+    }
+}
+impl Error for BackendKindParseError {}
