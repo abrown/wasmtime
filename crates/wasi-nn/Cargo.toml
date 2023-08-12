@@ -26,5 +26,8 @@ thiserror = { workspace = true }
 [build-dependencies]
 walkdir = { workspace = true }
 
+[dev-dependencies]
+reqwest = { version = "0.11", features = ["blocking"] }
+
 [features]
 component-model = ["wasmtime"]

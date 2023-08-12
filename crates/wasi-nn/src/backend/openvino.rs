@@ -157,8 +157,93 @@ fn map_tensor_type_to_precision(tensor_type: TensorType) -> openvino::Precision 
 /// Read a file into a byte vector.
 fn read(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut file = File::open(path)?;
-    let file_size = file.metadata()?.len();
-    let mut buffer = vec![0; file_size as usize];
+    let mut buffer = vec![];
     file.read_to_end(&mut buffer)?;
     Ok(buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Context;
+    use std::{env, mem, panic, path::Path, slice};
+
+    #[test]
+    fn image_classification_directly_on_backend() -> anyhow::Result<()> {
+        if !check_openvino() || !check_openvino_artifacts() {
+            println!("> unable to run `image_classification_directly_on_backend` test");
+            return Ok(());
+        }
+
+        // Compute a MobileNet classification using the test artifacts.
+        let mut backend = OpenvinoBackend::default();
+        let mut graph = backend.load_from_dir(Path::new(env!("OUT_DIR")), ExecutionTarget::CPU)?;
+        let mut context = graph.init_execution_context()?;
+        let data = read(&Path::new(env!("OUT_DIR")).join("tensor.bgr"))?;
+        let tensor = Tensor {
+            dims: &[1, 3, 224, 224],
+            ty: TensorType::F32,
+            data: &data,
+        };
+        context.set_input(0, &tensor)?;
+        context.compute()?;
+        let mut destination = vec![0f32; 1001];
+        let destination_ = unsafe {
+            slice::from_raw_parts_mut(
+                destination.as_mut_ptr().cast(),
+                destination.len() * mem::size_of::<f32>(),
+            )
+        };
+        context.get_output(0, destination_)?;
+
+        // Find the top score which should be the entry for "pizza" (see
+        // https://github.com/leferrad/tensorflow-mobilenet/blob/master/imagenet/labels.txt,
+        // e.g.)
+        let (id, score) = destination
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
+        println!("> top match: label #{} = {}", id, score);
+        assert_eq!(id, 964);
+
+        Ok(())
+    }
+
+    /// Return `true` if we find a working OpenVINO installation.
+    fn check_openvino() -> bool {
+        panic::catch_unwind(|| println!("> found openvino version: {}", openvino::version()))
+            .is_ok()
+    }
+
+    /// Return `true` if we find the cached MobileNet test artifacts; this will
+    /// download the artifacts if necessary.
+    fn check_openvino_artifacts() -> bool {
+        const BASE_URL: &str = "https://github.com/intel/openvino-rs/raw/main/crates/openvino/tests/fixtures/mobilenet";
+        let artifacts_dir = Path::new(env!("OUT_DIR"));
+        for (from, to) in [
+            ("mobilenet.bin", "model.bin"),
+            ("mobilenet.xml", "model.xml"),
+            ("tensor-1x224x224x3-f32.bgr", "tensor.bgr"),
+        ] {
+            let remote_url = [BASE_URL, from].join("/");
+            let local_path = artifacts_dir.join(to);
+            if !local_path.is_file() {
+                download(&remote_url, &local_path)
+                    .with_context(|| "unable to retrieve test artifact")
+                    .unwrap();
+            } else {
+                println!("> using cached artifact: {}", local_path.display())
+            }
+        }
+        true
+    }
+
+    /// Retrieve the bytes at the `from` URL and place them in the `to` file.
+    fn download(from: &str, to: &Path) -> anyhow::Result<()> {
+        println!("> downloading:\n  {} ->\n  {}", from, to.display());
+        let mut file = File::create(to)?;
+        let _ = reqwest::blocking::get(from)?.copy_to(&mut file)?;
+        Ok(())
+    }
 }
