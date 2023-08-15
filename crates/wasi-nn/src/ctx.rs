@@ -76,6 +76,8 @@ pub enum UsageError {
     InvalidExecutionContextHandle,
     #[error("Not enough memory to copy tensor data of size: {0}")]
     NotEnoughMemory(u32),
+    #[error("No graph found with name: {0}")]
+    NotFound(String),
 }
 
 pub(crate) type WasiNnResult<T> = std::result::Result<T, WasiNnError>;

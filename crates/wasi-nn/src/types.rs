@@ -16,6 +16,7 @@ pub struct Tensor<'a> {
 pub enum TensorType {
     F16,
     F32,
+    BF16,
     U8,
     I32,
 }
@@ -33,4 +34,5 @@ pub enum GraphEncoding {
     Tensorflow,
     PyTorch,
     TensorflowLite,
+    Autodetect,
 }

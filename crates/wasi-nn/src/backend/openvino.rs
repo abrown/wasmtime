@@ -151,6 +151,7 @@ fn map_tensor_type_to_precision(tensor_type: TensorType) -> openvino::Precision 
         TensorType::F32 => Precision::FP32,
         TensorType::U8 => Precision::U8,
         TensorType::I32 => Precision::I32,
+        TensorType::BF16 => todo!(),
     }
 }
 

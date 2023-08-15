@@ -22,7 +22,7 @@ pub use gen::wasi_ephemeral_nn::add_to_linker;
 mod gen {
     use super::*;
     wiggle::from_witx!({
-        witx: ["$WASI_ROOT/phases/ephemeral/witx/wasi_ephemeral_nn.witx"],
+        witx: ["$WASI_ROOT/wasi-nn.witx"],
         errors: { nn_errno => WasiNnError }
     });
 
@@ -77,6 +77,17 @@ impl<'a> gen::wasi_ephemeral_nn::WasiEphemeralNn for WasiNnCtx {
         };
         let graph_id = self.graphs.insert(graph);
         Ok(graph_id.into())
+    }
+
+    fn load_by_name<'b>(&mut self, name: &wiggle::GuestPtr<'b, str>) -> Result<gen::types::Graph> {
+        let name = name.as_str()?.unwrap();
+        if let Some(graph) = self.registry.get_mut(&name) {
+            todo!("TODO: need graphs to be clone-able")
+            //let graph_id = self.graphs.insert(graph);
+            //Ok(graph_id.into())
+        } else {
+            return Err(UsageError::NotFound(name.to_string()).into());
+        }
     }
 
     fn init_execution_context(
@@ -158,6 +169,13 @@ impl From<gen::types::GraphEncoding> for crate::types::GraphEncoding {
     fn from(value: gen::types::GraphEncoding) -> Self {
         match value {
             gen::types::GraphEncoding::Openvino => crate::types::GraphEncoding::OpenVINO,
+            gen::types::GraphEncoding::Onnx => crate::types::GraphEncoding::ONNX,
+            gen::types::GraphEncoding::Tensorflow => crate::types::GraphEncoding::Tensorflow,
+            gen::types::GraphEncoding::Pytorch => crate::types::GraphEncoding::PyTorch,
+            gen::types::GraphEncoding::Tensorflowlite => {
+                crate::types::GraphEncoding::TensorflowLite
+            }
+            gen::types::GraphEncoding::Autodetect => crate::types::GraphEncoding::Autodetect,
         }
     }
 }
