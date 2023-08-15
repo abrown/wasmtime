@@ -82,9 +82,8 @@ impl<'a> gen::wasi_ephemeral_nn::WasiEphemeralNn for WasiNnCtx {
     fn load_by_name<'b>(&mut self, name: &wiggle::GuestPtr<'b, str>) -> Result<gen::types::Graph> {
         let name = name.as_str()?.unwrap();
         if let Some(graph) = self.registry.get_mut(&name) {
-            todo!("TODO: need graphs to be clone-able")
-            //let graph_id = self.graphs.insert(graph);
-            //Ok(graph_id.into())
+            let graph_id = self.graphs.insert(graph.clone().into());
+            Ok(graph_id.into())
         } else {
             return Err(UsageError::NotFound(name.to_string()).into());
         }

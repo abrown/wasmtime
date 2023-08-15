@@ -8,10 +8,9 @@
 
 mod in_memory;
 
-use crate::backend::BackendGraph;
+use crate::Graph;
 pub use in_memory::InMemoryRegistry;
 
-type Graph = Box<dyn BackendGraph>;
 pub trait GraphRegistry: Send + Sync {
     fn get_mut(&mut self, name: &str) -> Option<&mut Graph>;
 }

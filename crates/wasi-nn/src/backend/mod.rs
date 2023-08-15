@@ -5,7 +5,10 @@
 mod openvino;
 
 use self::openvino::OpenvinoBackend;
-use crate::types::{ExecutionTarget, Tensor};
+use crate::{
+    types::{ExecutionTarget, Tensor},
+    ExecutionContext, Graph,
+};
 use std::{error::Error, fmt, path::Path, str::FromStr};
 use thiserror::Error;
 use wiggle::GuestError;
@@ -18,22 +21,22 @@ pub fn list() -> Vec<(BackendKind, Box<dyn Backend>)> {
 /// A [Backend] contains the necessary state to load [BackendGraph]s.
 pub trait Backend: Send + Sync {
     fn name(&self) -> &str;
-    fn load(
-        &mut self,
-        builders: &[&[u8]],
-        target: ExecutionTarget,
-    ) -> Result<Box<dyn BackendGraph>, BackendError>;
+    fn load(&mut self, builders: &[&[u8]], target: ExecutionTarget) -> Result<Graph, BackendError>;
     fn load_from_dir(
         &mut self,
         path: &Path,
         target: ExecutionTarget,
-    ) -> Result<Box<dyn BackendGraph>, BackendError>;
+    ) -> Result<Graph, BackendError>;
 }
 
 /// A [BackendGraph] can create [BackendExecutionContext]s; this is the backing
 /// implementation for a [crate::witx::types::Graph].
 pub trait BackendGraph: Send + Sync {
-    fn init_execution_context(&mut self) -> Result<Box<dyn BackendExecutionContext>, BackendError>;
+    /// This is unconventional, but for registries to work, we need to be able
+    /// to retrieve mutable copies of a graph without removing it from the
+    /// registry.
+    fn clone(&self) -> Box<dyn BackendGraph>;
+    fn init_execution_context(&mut self) -> Result<ExecutionContext, BackendError>;
 }
 
 /// A [BackendExecutionContext] performs the actual inference; this is the

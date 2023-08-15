@@ -48,7 +48,12 @@ impl gen::graph::Host for WasiNnCtx {
         &mut self,
         name: String,
     ) -> wasmtime::Result<Result<gen::graph::Graph, gen::errors::Error>> {
-        todo!()
+        if let Some(graph) = self.registry.get_mut(&name) {
+            let graph_id = self.graphs.insert(graph.clone().into());
+            Ok(Ok(graph_id))
+        } else {
+            return Err(UsageError::NotFound(name.to_string()).into());
+        }
     }
 }
 

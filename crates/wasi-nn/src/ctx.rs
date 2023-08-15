@@ -1,8 +1,8 @@
 //! Implements the host state for the `wasi-nn` API: [WasiNnCtx].
 
-use crate::backend::{Backend, BackendError, BackendExecutionContext, BackendGraph, BackendKind};
+use crate::backend::{Backend, BackendError, BackendKind};
 use crate::types::GraphEncoding;
-use crate::{GraphRegistry, InMemoryRegistry};
+use crate::{ExecutionContext, Graph, GraphRegistry, InMemoryRegistry};
 use anyhow::anyhow;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -35,8 +35,8 @@ pub fn preload(preload_graphs: &[(String, String)]) -> anyhow::Result<(Backends,
 pub struct WasiNnCtx {
     pub(crate) backends: Backends,
     pub(crate) registry: Registry,
-    pub(crate) graphs: Table<GraphId, Box<dyn BackendGraph>>,
-    pub(crate) executions: Table<GraphExecutionContextId, Box<dyn BackendExecutionContext>>,
+    pub(crate) graphs: Table<GraphId, Graph>,
+    pub(crate) executions: Table<GraphExecutionContextId, ExecutionContext>,
 }
 
 impl WasiNnCtx {
