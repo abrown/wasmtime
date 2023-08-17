@@ -1,5 +1,5 @@
 [package]
-name = "wasi-nn-example"
+name = "image-classification"
 version = "0.0.0"
 authors = ["The Wasmtime Project Developers"]
 readme = "README.md"
