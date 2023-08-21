@@ -1,6 +1,6 @@
 //! Implements the host state for the `wasi-nn` API: [WasiNnCtx].
 
-use crate::backend::{Backend, BackendError, BackendKind};
+use crate::backend::{self, Backend, BackendError, BackendKind};
 use crate::wit::types::GraphEncoding;
 use crate::{ExecutionContext, Graph, GraphRegistry, InMemoryRegistry};
 use anyhow::anyhow;
@@ -22,7 +22,7 @@ type GraphDirectory = String;
 pub fn preload(
     preload_graphs: &[(BackendName, GraphDirectory)],
 ) -> anyhow::Result<(Backends, Registry)> {
-    let mut backends: HashMap<_, _> = crate::backend::list().into_iter().collect();
+    let mut backends: HashMap<_, _> = backend::list().into_iter().collect();
     let mut registry = InMemoryRegistry::new();
     for (kind, path) in preload_graphs {
         let backend = backends
@@ -52,6 +52,15 @@ impl WasiNnCtx {
             graphs: Table::default(),
             executions: Table::default(),
         }
+    }
+}
+
+impl Default for WasiNnCtx {
+    fn default() -> Self {
+        Self::new(
+            backend::list().into_iter().collect(),
+            Box::new(InMemoryRegistry::new()),
+        )
     }
 }
 
