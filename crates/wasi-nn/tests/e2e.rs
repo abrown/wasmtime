@@ -1,3 +1,9 @@
+//! Embed wasi-nn in Wasmtime and compute an inference by:
+//! - downloading any necessary model artifacts (`test_check!`)
+//! - setting up a wasi + wasi-nn environment
+//! - build an `example` crate into a `*.wasm` file
+//! - run the `*.wasm` file.
+
 use anyhow::Result;
 use std::{path::Path, path::PathBuf, process::Command};
 use wasmtime::{Engine, Linker, Module, Store};
@@ -29,8 +35,8 @@ fn image_classification() -> Result<()> {
 fn image_classification_with_names() -> Result<()> {
     wasmtime_wasi_nn::test_check!();
 
-    // Set up a WASI environment that includes wasi-nn and opens the MobileNet
-    // artifacts directory as `fixture` in the guest.
+    // Set up a WASI environment that includes wasi-nn and uses a registry with
+    // the "mobilenet" name populated.
     let engine = Engine::default();
     let mut openvino = backend::openvino::OpenvinoBackend::default();
     let mut registry = InMemoryRegistry::new();
