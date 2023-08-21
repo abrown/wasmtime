@@ -46,7 +46,7 @@ impl std::ops::DerefMut for ExecutionContext {
 #[cfg(feature = "test-check")]
 pub mod test_check {
     use anyhow::{anyhow, Context, Result};
-    use std::{env, fs::File, path::Path, path::PathBuf};
+    use std::{env, fs, fs::File, path::Path, path::PathBuf};
 
     #[macro_export]
     macro_rules! test_check {
@@ -80,7 +80,7 @@ pub mod test_check {
     }
 
     pub fn artifacts_dir() -> PathBuf {
-        PathBuf::from(env!("OUT_DIR"))
+        PathBuf::from(env!("OUT_DIR")).join("mobilenet")
     }
 
     /// Return `Ok` if we find the cached MobileNet test artifacts; this will
@@ -88,6 +88,7 @@ pub mod test_check {
     fn check_openvino_artifacts_are_available() -> Result<()> {
         const BASE_URL: &str = "https://github.com/intel/openvino-rs/raw/main/crates/openvino/tests/fixtures/mobilenet";
         let artifacts_dir = artifacts_dir();
+        fs::create_dir(&artifacts_dir)?;
         for (from, to) in [
             ("mobilenet.bin", "model.bin"),
             ("mobilenet.xml", "model.xml"),
