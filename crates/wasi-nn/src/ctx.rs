@@ -1,14 +1,13 @@
 //! Implements the host state for the `wasi-nn` API: [WasiNnCtx].
 
-use crate::backend::{self, Backend, BackendError, BackendKind};
+use crate::backend::{self, BackendError, BackendKind};
 use crate::wit::types::GraphEncoding;
-use crate::{ExecutionContext, Graph, GraphRegistry, InMemoryRegistry};
+use crate::{Backend, ExecutionContext, Graph, InMemoryRegistry, Registry};
 use anyhow::anyhow;
 use std::{collections::HashMap, hash::Hash, path::Path};
 use thiserror::Error;
 use wiggle::GuestError;
 
-type Registry = Box<dyn GraphRegistry>;
 type GraphId = u32;
 type GraphExecutionContextId = u32;
 type BackendName = String;
@@ -20,7 +19,7 @@ type GraphDirectory = String;
 /// model types.
 pub fn preload(
     preload_graphs: &[(BackendName, GraphDirectory)],
-) -> anyhow::Result<(impl IntoIterator<Item = Box<dyn Backend>>, Registry)> {
+) -> anyhow::Result<(impl IntoIterator<Item = Backend>, Registry)> {
     let mut backends = backend::list();
     let mut registry = InMemoryRegistry::new();
     for (kind, path) in preload_graphs {
@@ -33,12 +32,12 @@ pub fn preload(
             .ok_or(anyhow!("{} does not support directory loading", kind))?;
         registry.load(backend, Path::new(path))?;
     }
-    Ok((backends, Box::new(registry)))
+    Ok((backends, Registry::from(registry)))
 }
 
 /// Capture the state necessary for calling into the backend ML libraries.
 pub struct WasiNnCtx {
-    pub(crate) backends: Backends,
+    pub(crate) backends: HashMap<BackendKind, Backend>,
     pub(crate) registry: Registry,
     pub(crate) graphs: Table<GraphId, Graph>,
     pub(crate) executions: Table<GraphExecutionContextId, ExecutionContext>,
@@ -46,7 +45,7 @@ pub struct WasiNnCtx {
 
 impl WasiNnCtx {
     /// Make a new context from the default state.
-    pub fn new(backends: impl IntoIterator<Item = Box<dyn Backend>>, registry: Registry) -> Self {
+    pub fn new(backends: impl IntoIterator<Item = Backend>, registry: Registry) -> Self {
         let backends = backends.into_iter().map(|b| (b.kind(), b)).collect();
         Self {
             backends,
@@ -59,7 +58,7 @@ impl WasiNnCtx {
 
 impl Default for WasiNnCtx {
     fn default() -> Self {
-        Self::new(backend::list(), Box::new(InMemoryRegistry::new()))
+        Self::new(backend::list(), Registry::from(InMemoryRegistry::new()))
     }
 }
 
@@ -137,6 +136,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::registry::GraphRegistry;
 
     #[test]
     fn example() {
@@ -147,6 +147,6 @@ mod test {
             }
         }
 
-        let ctx = WasiNnCtx::new([], Box::new(FakeRegistry));
+        let ctx = WasiNnCtx::new([], Registry::from(FakeRegistry));
     }
 }

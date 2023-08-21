@@ -36,7 +36,7 @@ fn image_classification_with_names() -> Result<()> {
     let mut registry = InMemoryRegistry::new();
     let mobilenet_dir = wasmtime_wasi_nn::test_check::artifacts_dir();
     registry.load(&mut openvino, &mobilenet_dir)?;
-    let wasi_nn = WasiNnCtx::new([Box::new(openvino) as _], Box::new(registry));
+    let wasi_nn = WasiNnCtx::new([openvino.into()], registry.into());
     let (mut store, mut linker) = embed_wasi_nn(&engine, wasi_nn)?;
 
     // Build and run the example crate.

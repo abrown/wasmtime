@@ -43,6 +43,46 @@ impl std::ops::DerefMut for ExecutionContext {
     }
 }
 
+/// A Backend
+pub struct Backend(Box<dyn backend::BackendInner>);
+impl std::ops::Deref for Backend {
+    type Target = dyn backend::BackendInner;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+impl std::ops::DerefMut for Backend {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+impl<T: backend::BackendInner + 'static> From<T> for Backend {
+    fn from(value: T) -> Self {
+        Self(Box::new(value))
+    }
+}
+
+pub struct Registry(Box<dyn GraphRegistry>);
+impl std::ops::Deref for Registry {
+    type Target = dyn GraphRegistry;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
+impl std::ops::DerefMut for Registry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut()
+    }
+}
+impl<T> From<T> for Registry
+where
+    T: GraphRegistry + 'static,
+{
+    fn from(value: T) -> Self {
+        Self(Box::new(value))
+    }
+}
+
 #[cfg(feature = "test-check")]
 pub mod test_check {
     use anyhow::{anyhow, Context, Result};
