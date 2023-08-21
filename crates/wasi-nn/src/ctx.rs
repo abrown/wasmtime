@@ -8,7 +8,6 @@ use std::{collections::HashMap, hash::Hash, path::Path};
 use thiserror::Error;
 use wiggle::GuestError;
 
-type Backends = HashMap<BackendKind, Box<dyn Backend>>;
 type Registry = Box<dyn GraphRegistry>;
 type GraphId = u32;
 type GraphExecutionContextId = u32;
@@ -21,12 +20,14 @@ type GraphDirectory = String;
 /// model types.
 pub fn preload(
     preload_graphs: &[(BackendName, GraphDirectory)],
-) -> anyhow::Result<(Backends, Registry)> {
-    let mut backends: HashMap<_, _> = backend::list().into_iter().collect();
+) -> anyhow::Result<(impl IntoIterator<Item = Box<dyn Backend>>, Registry)> {
+    let mut backends = backend::list();
     let mut registry = InMemoryRegistry::new();
     for (kind, path) in preload_graphs {
+        let kind_ = kind.parse()?;
         let backend = backends
-            .get_mut(&kind.parse()?)
+            .iter_mut()
+            .find(|b| b.kind() == kind_)
             .ok_or(anyhow!("unsupported backend: {}", kind))?
             .as_dir_loadable()
             .ok_or(anyhow!("{} does not support directory loading", kind))?;
@@ -45,7 +46,8 @@ pub struct WasiNnCtx {
 
 impl WasiNnCtx {
     /// Make a new context from the default state.
-    pub fn new(backends: Backends, registry: Registry) -> Self {
+    pub fn new(backends: impl IntoIterator<Item = Box<dyn Backend>>, registry: Registry) -> Self {
+        let backends = backends.into_iter().map(|b| (b.kind(), b)).collect();
         Self {
             backends,
             registry,
@@ -57,10 +59,7 @@ impl WasiNnCtx {
 
 impl Default for WasiNnCtx {
     fn default() -> Self {
-        Self::new(
-            backend::list().into_iter().collect(),
-            Box::new(InMemoryRegistry::new()),
-        )
+        Self::new(backend::list(), Box::new(InMemoryRegistry::new()))
     }
 }
 
@@ -148,6 +147,6 @@ mod test {
             }
         }
 
-        let ctx = WasiNnCtx::new(HashMap::new(), Box::new(FakeRegistry));
+        let ctx = WasiNnCtx::new([], Box::new(FakeRegistry));
     }
 }
