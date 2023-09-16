@@ -141,6 +141,14 @@ impl Engine {
         self.inner.allocator.as_ref()
     }
 
+    // pub(crate) fn allocator_mut(&mut self) -> &mut dyn InstanceAllocator {
+    //     // TODO: this is quite certainly not what we want to do here, but it
+    //     // points out how we will need to mutate the engine somehow in order to
+    //     // round-robin the protection key distribution.
+    //     let engine = Arc::get_mut(&mut self.inner).unwrap();
+    //     engine.allocator.as_mut()
+    // }
+
     pub(crate) fn profiler(&self) -> &dyn ProfilingAgent {
         self.inner.profiler.as_ref()
     }
