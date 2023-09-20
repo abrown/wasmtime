@@ -160,7 +160,7 @@ unsafe impl InstanceAllocatorImpl for OnDemandInstanceAllocator {
         None
     }
 
-    fn restrict_to_pkey(&self, pkey: ProtectionKey) {
+    fn restrict_to_pkey(&self, _: ProtectionKey) {
         // The on-demand allocator cannot use protection keys.
     }
 

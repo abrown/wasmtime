@@ -425,15 +425,9 @@ pub mod sys {
 mod pkru {
     use core::arch::asm;
 
-    /// This `PKRU` register mask allows access to any pages marked with any
-    /// key--in other words, reading and writing is permitted to all pages.
-    pub const ALLOW_ACCESS: u32 = 0;
-
     /// This `PKRU` register mask disables access to any page marked with any
     /// key--in other words, no reading or writing to all pages.
-    //pub const DISABLE_ACCESS: u32 = 0b01010101_01010101_01010101_01010101;
     pub const DISABLE_ACCESS: u32 = 0b11111111_11111111_11111111_11111111;
-    // TODO: set to all 1s?
 
     /// Read the value of the `PKRU` register.
     // #[cfg(test)]

@@ -259,7 +259,7 @@ unsafe impl InstanceAllocatorImpl for SingleMemoryInstance<'_> {
         unreachable!()
     }
 
-    fn restrict_to_pkey(&self, pkey: ProtectionKey) {
+    fn restrict_to_pkey(&self, _: ProtectionKey) {
         unreachable!()
     }
 
