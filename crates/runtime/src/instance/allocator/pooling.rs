@@ -78,7 +78,11 @@ cfg_if::cfg_if! {
 use super::{
     InstanceAllocationRequest, InstanceAllocatorImpl, MemoryAllocationIndex, TableAllocationIndex,
 };
-use crate::{instance::Instance, mpk::PkeyRef, CompiledModuleId, Memory, Table};
+use crate::{
+    instance::Instance,
+    mpk::{self, ProtectionKey, ProtectionMask},
+    CompiledModuleId, Memory, Table,
+};
 use anyhow::{bail, Result};
 use memory_pool::MemoryPool;
 use std::{
@@ -602,8 +606,16 @@ unsafe impl InstanceAllocatorImpl for PoolingInstanceAllocator {
         self.memories.purge_module(module);
     }
 
-    fn next_available_pkey(&self) -> Option<PkeyRef> {
+    fn next_available_pkey(&self) -> Option<ProtectionKey> {
         self.memories.next_available_pkey()
+    }
+
+    fn restrict_to_pkey(&self, pkey: ProtectionKey) {
+        mpk::allow(ProtectionMask::zero().or(pkey));
+    }
+
+    fn allow_all_pkeys(&self) {
+        mpk::allow(ProtectionMask::all());
     }
 }
 

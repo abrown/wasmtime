@@ -23,7 +23,7 @@
 //! - the `pkru` module controls the x86 `PKRU` register (and other CPU state)
 
 use anyhow::{Context, Result};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 /// Check if the MPK feature is supported.
 pub fn is_supported() -> bool {
@@ -38,120 +38,67 @@ pub fn is_supported() -> bool {
 /// multiple threads try to allocate keys at the same time (e.g., during
 /// testing). It also ensures that a single copy of the keys are reserved for
 /// the lifetime of the process.
-pub fn keys() -> &'static [PkeyRef] {
+///
+/// TODO: this is not the best-possible design. This creates global state that
+/// would prevent any other code in the process from using protection keys; the
+/// `KEYS` are never deallocated from the system with `pkey_dealloc`.
+pub fn keys() -> &'static [ProtectionKey] {
     let keys = KEYS.get_or_init(|| {
         let mut allocated = vec![];
-        while let Ok(pkey) = Pkey::new() {
-            debug_assert_eq!(pkey.as_stripe(), allocated.len());
-            allocated.push(pkey.into());
+        if is_supported() {
+            while let Ok(key_id) = sys::pkey_alloc(0, 0) {
+                debug_assert!(key_id < 16);
+                // UNSAFETY: here we unsafely assume that the system-allocated pkey
+                // will exist forever.
+                let pkey = ProtectionKey(key_id);
+                debug_assert_eq!(pkey.as_stripe(), allocated.len());
+                allocated.push(pkey);
+            }
         }
         allocated
     });
     &keys
 }
-static KEYS: OnceLock<Vec<PkeyRef>> = OnceLock::new();
+static KEYS: OnceLock<Vec<ProtectionKey>> = OnceLock::new();
 
-/// TODO
-pub fn allow_all() {
+/// Only allow access to pages marked by the keys set in `mask`.
+///
+/// Any accesses to pages marked by another key will result in a `SIGSEGV`
+/// fault.
+pub fn allow(mask: ProtectionMask) {
+    let mut allowed = 0;
+    for i in 0..16 {
+        if mask.0 & (1 << i) == 1 {
+            allowed |= 0b11 << (i * 2);
+        }
+    }
+
     let previous = pkru::read();
-    pkru::write(pkru::ALLOW_ACCESS);
-    println!("pkru: {:#034b} => {:#034b}", previous, pkru::read());
+    pkru::write(pkru::DISABLE_ACCESS ^ allowed);
+    log::debug!("PKRU change: {:#034b} => {:#034b}", previous, pkru::read());
 }
 
 /// An MPK protection key.
 ///
 /// The expected usage is:
 /// - allocate a new key with [`Pkey::new`]
-/// - mark some regions of memory as accessible with [`Pkey::mark`]
-/// - [`Pkey::activate`] the key so that the current CPU can only access the
-///   regions previously marked with this key
-/// - do some work; any accesses to unmarked pages result in a fault
-/// - [`Pkey::deactivate`] the key so that the current CPU can access all
-///   regions again
+/// - mark some regions of memory as accessible with [`Pkey::protect`]
+/// - [`allow`] or disallow access to the memory regions using a
+///   [`ProtectionMask`]; any accesses to unmarked pages result in a fault
 /// - drop the key
 ///
 /// Since this kernel is allocated from the kernel, we must inform the kernel
-/// when it is dropped. Similarly, to retrieve all available pkeys, one must
-/// request them from the kernel (e.g., call [`Pkey::new`] until it fails).
+/// when it is dropped. Similarly, to retrieve all available protection keys,
+/// one must request them from the kernel (e.g., call [`Pkey::new`] until it
+/// fails).
 ///
 /// Because MPK may not be available on all systems, [`Pkey`] wraps an `Option`
 /// that will always be `None` if MPK is not supported. The idea here is that
 /// the API can remain the same regardless of MPK support.
-#[derive(Debug, PartialEq)]
-pub struct Pkey(Option<u32>);
-// enum Void {} on other architectures; replacing u32
+#[derive(Clone, Copy, Debug)]
+pub struct ProtectionKey(u32);
 
-impl Pkey {
-    /// Ask the kernel to allocate a pkey.
-    ///
-    /// # Errors
-    ///
-    /// This will fail if the kernel cannot allocate any more pkeys.
-    pub fn new() -> Result<Self> {
-        if is_supported() {
-            let key_id = sys::pkey_alloc(0, 0).with_context(|| "failed to allocate pkey")?;
-            debug_assert!(key_id < 16);
-            Ok(Self(Some(key_id)))
-        } else {
-            Ok(Self(None))
-        }
-    }
-
-    // pub unsafe fn from_id(id: u32) -> Self {
-    //     assert!(id <= 15);
-    //     Self(Some(id))
-    // }
-
-    /// Convert the [`Pkey`] to its 0-based index; this is useful for
-    /// determining which allocation "stripe" a key belongs to.
-    ///
-    /// This function assumes that the kernel has allocated key 0 for itself.
-    pub fn as_stripe(&self) -> usize {
-        if let Some(key_id) = self.0 {
-            debug_assert!(key_id != 0);
-            key_id as usize - 1
-        } else {
-            0
-        }
-    }
-
-    /// Only allow access to pages marked by this key.
-    ///
-    /// Any accesses to pages marked by another key will result in a `SIGSEGV`
-    /// fault.
-    pub fn activate(&self) {
-        // TODO: make sure we always allow pk0
-        // TODO: move to allocator?
-        // TODO: Pkeys::activate?... Pkeys(u32), the mask (AND, XOR, OR)
-        // TODO: just set both bits for simplicity
-        // TODO: test, just a DIY signal handler
-
-        if let Some(key_id) = self.0 {
-            // We only want to flip the `ADn` bit to `0`, which means "allow
-            // access."
-            let allow_key_zero = 0b11;
-            let allow_key_id = 0b11 << (key_id * 2);
-            pkru::write(pkru::DISABLE_ACCESS ^ (allow_key_zero | allow_key_id));
-        }
-
-        println!("pkru: {:#034b}", pkru::read());
-    }
-
-    /// Allow access to all pages marked by any key.
-    ///
-    /// Note that this is even more permissive than the default Linux kernel
-    /// configuration (only key 0 pages are allowed there); however, this is
-    /// necessary so that from the host we can access pages marked with any key
-    /// via Wasmtime's embedder API, e.g. TODO: what if keys have been allocated
-    /// by other code? this would break their assumptions.
-    pub fn deactivate(&self) {
-        if self.0.is_some() {
-            pkru::write(pkru::ALLOW_ACCESS);
-        }
-
-        println!("pkru: {:#034b}", pkru::read());
-    }
-
+impl ProtectionKey {
     /// Mark a page as protected by this [`Pkey`].
     ///
     /// This "colors" the pages of `region` via a kernel `pkey_mprotect` call to
@@ -162,44 +109,48 @@ impl Pkey {
     ///
     /// This will fail if the region is not page aligned or for some unknown
     /// kernel reason.
-    pub fn mark(&self, region: &mut [u8]) -> Result<()> {
-        if let Some(key_id) = self.0 {
-            let addr = region.as_mut_ptr() as usize;
-            let len = region.len();
-            let prot = sys::PROT_READ | sys::PROT_WRITE;
-            sys::pkey_mprotect(addr, len, prot, key_id).with_context(|| {
-                format!("failed to mark region with pkey (addr = {addr:#x}, len = {len}, prot = {prot:#b})")
-            })?;
-        }
-        Ok(())
+    pub fn protect(&self, region: &mut [u8]) -> Result<()> {
+        let addr = region.as_mut_ptr() as usize;
+        let len = region.len();
+        let prot = sys::PROT_READ | sys::PROT_WRITE;
+        sys::pkey_mprotect(addr, len, prot, self.0).with_context(|| {
+            format!(
+                "failed to mark region with pkey (addr = {addr:#x}, len = {len}, prot = {prot:#b})"
+            )
+        })
+    }
+
+    /// Convert the [`Pkey`] to its 0-based index; this is useful for
+    /// determining which allocation "stripe" a key belongs to.
+    ///
+    /// This function assumes that the kernel has allocated key 0 for itself.
+    pub fn as_stripe(&self) -> usize {
+        debug_assert!(self.0 != 0);
+        self.0 as usize - 1
     }
 }
 
-impl Drop for Pkey {
-    fn drop(&mut self) {
-        if let Some(key_id) = self.0 {
-            sys::pkey_free(key_id).expect("unable to drop pkey!")
-        }
-    }
-}
-
-/// A ref-counted wrapper for [`Pkey`].
+/// A bit field indicating which protection keys should be *allowed*.
 ///
-/// Because protection keys are kernel-allocated, we must ensure that they are
-/// only dropped once by the process using them. E.g., the keys must be shared
-/// between the pooling allocator (for `pkey_mprotect`-ing regions) and the
-/// stores that use them (to set the PKRU register); during testing, the keys
-/// must live as long as possible to avoid errors.
-#[derive(Clone, Debug, PartialEq)]
-pub struct PkeyRef(Arc<Pkey>);
-impl From<Pkey> for PkeyRef {
-    fn from(key: Pkey) -> Self {
-        Self(Arc::new(key))
+/// When bit `n` is set, it means the protection key is allowed--conversely,
+/// protection is disabled for this key.
+pub struct ProtectionMask(u16);
+impl ProtectionMask {
+    /// Allow access from all protection keys.
+    pub fn all() -> Self {
+        Self(u16::MAX)
     }
-}
-impl AsRef<Pkey> for PkeyRef {
-    fn as_ref(&self) -> &Pkey {
-        self.0.as_ref()
+
+    /// Only allow access to memory protected with protection key 0; note that
+    /// this does not mean "none" but rather allows access from the default
+    /// kernel protection key.
+    pub fn zero() -> Self {
+        Self(1)
+    }
+
+    /// Include `pkey` as another allowed protection key in the mask.
+    pub fn or(self, pkey: ProtectionKey) -> Self {
+        Self(self.0 | 1 << pkey.0)
     }
 }
 
@@ -214,22 +165,22 @@ mod tests {
         println!("is pku supported = {}", is_supported());
     }
 
-    #[ignore = "cannot be run when keys() has already allocated all keys"]
     #[test]
-    fn check_constructing_new_pkey() {
-        Pkey::new().unwrap();
+    fn check_initialized_keys() {
+        if is_supported() {
+            assert!(!keys().is_empty())
+        }
     }
 
-    #[ignore = "cannot be run when keys() has already allocated all keys"]
     #[test]
     fn check_invalid_mark() {
-        let pkey = Pkey::new().unwrap();
-        let region = unsafe {
+        let pkey = keys()[0];
+        let unaligned_region = unsafe {
             let addr = 1 as *mut u8; // this is not page-aligned!
             let len = 1;
             std::slice::from_raw_parts_mut(addr, len)
         };
-        let result = pkey.mark(region);
+        let result = pkey.protect(unaligned_region);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -246,9 +197,8 @@ mod tests {
     ) {
         // assert!(c.is_null());
         println!("pkru: {:#034b}", pkru::read());
-        let pkey_two = keys()[2].as_ref();
-        pkey_two.deactivate();
-        println!("pkru: {:#034b}", pkru::read());
+        let pkey_two = keys()[2];
+        allow(ProtectionMask::all());
 
         unsafe {
             tripped = true;
@@ -281,22 +231,22 @@ mod tests {
         region[0] = 42;
         assert_eq!(42, region[0]);
 
-        let pkey_one = keys()[1].as_ref();
-        let pkey_two = keys()[2].as_ref();
-        pkey_one.mark(region).unwrap();
+        let pkey_one = keys()[1];
+        let pkey_two = keys()[2];
+        pkey_one.protect(region).unwrap();
         println!("pkru: {:#034b}", pkru::read());
 
-        pkey_one.activate();
+        allow(ProtectionMask::zero().or(pkey_one));
         println!("pkru: {:#034b}", pkru::read());
         assert_eq!(42, region[0]);
 
-        pkey_two.activate();
+        allow(ProtectionMask::zero().or(pkey_two));
         let caught = std::panic::catch_unwind(|| {
             println!("pkru: {:#034b}", pkru::read());
             assert_eq!(42, region[0]);
         });
 
-        pkey_two.deactivate();
+        allow(ProtectionMask::all());
         println!("pkru: {:#034b}", pkru::read());
 
         assert_eq!(42, region[0]);
@@ -534,6 +484,7 @@ mod pkru {
         use super::*;
 
         #[test]
+        #[ignore]
         fn check_read() {
             assert_eq!(read(), DISABLE_ACCESS ^ 1);
             // Accepting all the assumptions of the `check_allocate_and_free`

@@ -10,7 +10,7 @@ use wasmtime_environ::{
     DefinedMemoryIndex, DefinedTableIndex, EntityIndex, HostPtr, MemoryPlan, MemoryStyle, Module,
     VMOffsets, WASM_PAGE_SIZE,
 };
-use wasmtime_runtime::mpk::PkeyRef;
+use wasmtime_runtime::mpk::ProtectionKey;
 use wasmtime_runtime::{
     CompiledModuleId, Imports, InstanceAllocationRequest, InstanceAllocator, InstanceAllocatorImpl,
     Memory, MemoryAllocationIndex, MemoryImage, OnDemandInstanceAllocator, RuntimeLinearMemory,
@@ -255,7 +255,15 @@ unsafe impl InstanceAllocatorImpl for SingleMemoryInstance<'_> {
         unreachable!()
     }
 
-    fn next_available_pkey(&self) -> Option<PkeyRef> {
+    fn next_available_pkey(&self) -> Option<ProtectionKey> {
+        unreachable!()
+    }
+
+    fn restrict_to_pkey(&self, pkey: ProtectionKey) {
+        unreachable!()
+    }
+
+    fn allow_all_pkeys(&self) {
         unreachable!()
     }
 }

@@ -96,7 +96,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use wasmtime_runtime::{
-    mpk::PkeyRef, ExportGlobal, ExportMemory, InstanceAllocationRequest, InstanceAllocator,
+    mpk::ProtectionKey, ExportGlobal, ExportMemory, InstanceAllocationRequest, InstanceAllocator,
     InstanceHandle, ModuleInfo, OnDemandInstanceAllocator, SignalHandler, StoreBox, StorePtr,
     VMContext, VMExternRef, VMExternRefActivationsTable, VMFuncRef, VMRuntimeLimits, WasmFault,
 };
@@ -346,7 +346,7 @@ pub struct StoreOpaque {
     /// Keep track of what protection key is being used during allocation so
     /// that the right memory pages can be enabled when entering WebAssembly
     /// guest code.
-    pkey: Option<PkeyRef>,
+    pkey: Option<ProtectionKey>,
 
     /// Runtime state for components used in the handling of resources, borrow,
     /// and calls. These also interact with the `ResourceAny` type and its
@@ -1157,10 +1157,12 @@ impl<T> StoreInner<T> {
 
     pub fn call_hook(&mut self, s: CallHook) -> Result<()> {
         if let Some(pkey) = &self.inner.pkey {
+            let allocator = self.engine().allocator();
             match s {
-                // TODO: self.engine().allocator().activate_pkey(pkey)
-                CallHook::CallingWasm | CallHook::ReturningFromHost => pkey.as_ref().activate(),
-                CallHook::ReturningFromWasm | CallHook::CallingHost => pkey.as_ref().deactivate(),
+                CallHook::CallingWasm | CallHook::ReturningFromHost => {
+                    allocator.restrict_to_pkey(*pkey)
+                }
+                CallHook::ReturningFromWasm | CallHook::CallingHost => allocator.allow_all_pkeys(),
             }
         }
 
@@ -1598,7 +1600,7 @@ at https://bytecodealliance.org/security.
 
     /// Retrieve the store's protection key.
     #[inline]
-    pub(crate) fn get_pkey(&self) -> Option<PkeyRef> {
+    pub(crate) fn get_pkey(&self) -> Option<ProtectionKey> {
         self.pkey.clone()
     }
 

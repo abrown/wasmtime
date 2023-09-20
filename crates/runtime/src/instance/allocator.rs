@@ -1,7 +1,7 @@
 use crate::imports::Imports;
 use crate::instance::{Instance, InstanceHandle};
 use crate::memory::Memory;
-use crate::mpk::PkeyRef;
+use crate::mpk::ProtectionKey;
 use crate::table::Table;
 use crate::{CompiledModuleId, ModuleRuntimeInfo, Store};
 use anyhow::{anyhow, bail, Result};
@@ -65,7 +65,7 @@ pub struct InstanceAllocationRequest<'a> {
 
     /// Request that the instance's memories be protected by a specific
     /// protection key.
-    pub pkey: Option<PkeyRef>,
+    pub pkey: Option<ProtectionKey>,
 }
 
 /// A pointer to a Store. This Option<*mut dyn Store> is wrapped in a struct
@@ -280,7 +280,18 @@ pub unsafe trait InstanceAllocatorImpl {
     /// The pooling allocator can use memory protection keys (MPK) for
     /// compressing the guard regions protecting against OOB. Each
     /// pool-allocated store needs its own key.
-    fn next_available_pkey(&self) -> Option<PkeyRef>;
+    fn next_available_pkey(&self) -> Option<ProtectionKey>;
+
+    /// Restrict access to memory regions protected by `pkey`.
+    ///
+    /// This is useful for the pooling allocator, which can use memory
+    /// protection keys (MPK). Note: this may still allow access to other
+    /// protection keys, such as the default kernel key; see implementations of
+    /// this.
+    fn restrict_to_pkey(&self, pkey: ProtectionKey);
+
+    /// Allow access to memory regions protected by any protection key.
+    fn allow_all_pkeys(&self);
 }
 
 /// A thing that can allocate instances.

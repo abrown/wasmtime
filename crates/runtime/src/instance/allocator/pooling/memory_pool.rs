@@ -62,7 +62,7 @@ use super::{
     index_allocator::{MemoryInModule, ModuleAffinityIndexAllocator, SlotId},
     MemoryAllocationIndex,
 };
-use crate::mpk::{self, Pkey, PkeyRef};
+use crate::mpk::{self, ProtectionKey, ProtectionMask};
 use crate::{
     AutoEnabled, CompiledModuleId, InstanceAllocationRequest, Memory, MemoryImageSlot, Mmap,
     PoolingInstanceAllocatorConfig,
@@ -87,7 +87,7 @@ use wasmtime_environ::{
 #[derive(Debug)]
 struct Stripe {
     allocator: ModuleAffinityIndexAllocator,
-    pkey: Option<PkeyRef>,
+    pkey: Option<ProtectionKey>,
 }
 
 /// Represents a pool of WebAssembly linear memories.
@@ -199,7 +199,7 @@ impl MemoryPool {
         // - and we expect no other code (e.g., host-side code) to modify this
         //   global MPK configuration
         if !pkeys.is_empty() {
-            mpk::allow_all();
+            mpk::allow(ProtectionMask::all());
         }
 
         // Interpret the larger of the maximal size of memory or the static
@@ -233,7 +233,7 @@ impl MemoryPool {
             for i in 0..constraints.num_memory_slots {
                 let pkey = &pkeys[i % pkeys.len()];
                 let region = unsafe { mapping.slice_mut(cursor..cursor + layout.slot_bytes) };
-                pkey.as_ref().mark(region)?;
+                pkey.protect(region)?;
                 cursor += layout.slot_bytes;
             }
             debug_assert_eq!(
@@ -283,7 +283,7 @@ impl MemoryPool {
     }
 
     /// Return a protection key that stores can use for requesting new
-    pub fn next_available_pkey(&self) -> Option<PkeyRef> {
+    pub fn next_available_pkey(&self) -> Option<ProtectionKey> {
         let index = self.next_available_pkey.fetch_add(1, Ordering::SeqCst) % self.stripes.len();
         debug_assert!(
             self.stripes.len() < 2 || self.stripes[index].pkey.is_some(),
@@ -350,7 +350,7 @@ impl MemoryPool {
         memory_index: DefinedMemoryIndex,
     ) -> Result<(MemoryAllocationIndex, Memory)> {
         let stripe_index = if let Some(pkey) = &request.pkey {
-            pkey.as_ref().as_stripe()
+            pkey.as_stripe()
         } else {
             debug_assert!(self.stripes.len() < 2);
             0
