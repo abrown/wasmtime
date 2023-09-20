@@ -537,13 +537,6 @@ impl MemoryPool {
 
 impl Drop for MemoryPool {
     fn drop(&mut self) {
-        // Reset the protection bits for the allocated slab.
-        let region = unsafe { self.mapping.slice_mut(0..self.mapping.len()) };
-        let addr = region.as_mut_ptr() as usize;
-        let len = region.len();
-        let prot = mpk::sys::PROT_READ | mpk::sys::PROT_WRITE;
-        mpk::sys::pkey_mprotect(addr, len, prot, 0).unwrap();
-
         // Clear the `clear_no_drop` flag (i.e., ask to *not* clear on
         // drop) for all slots, and then drop them here. This is
         // valid because the one `Mmap` that covers the whole region
