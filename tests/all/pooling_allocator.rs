@@ -1151,8 +1151,7 @@ fn total_memories_limit() -> Result<()> {
 
     let mut pool = crate::small_pool_config();
     pool.total_memories(TOTAL_MEMORIES)
-        .total_core_instances(TOTAL_MEMORIES + 1)
-        .memory_protection_keys(wasmtime_runtime::AutoEnabled::Disable);
+        .total_core_instances(TOTAL_MEMORIES + 1);
     let mut config = Config::new();
     config.allocation_strategy(InstanceAllocationStrategy::Pooling(pool));
 

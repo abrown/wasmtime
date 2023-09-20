@@ -192,7 +192,7 @@ fn guards_present_pooling() -> Result<()> {
     const GUARD_SIZE: u64 = 65536;
 
     let mut pool = crate::small_pool_config();
-    pool.total_memories(100).memory_pages(10);
+    pool.total_memories(2).memory_pages(10);
     let mut config = Config::new();
     config.static_memory_maximum_size(1 << 20);
     config.dynamic_memory_guard_size(GUARD_SIZE);
