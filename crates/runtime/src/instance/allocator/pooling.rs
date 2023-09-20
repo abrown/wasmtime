@@ -231,7 +231,7 @@ impl Default for PoolingInstanceAllocatorConfig {
             async_stack_keep_resident: 0,
             linear_memory_keep_resident: 0,
             table_keep_resident: 0,
-            memory_protection_keys: AutoEnabled::Auto,
+            memory_protection_keys: AutoEnabled::Disable,
         }
     }
 }

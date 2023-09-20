@@ -2198,7 +2198,7 @@ impl<T> StoreInner<T> {
 
 impl<T: Default> Default for Store<T> {
     fn default() -> Store<T> {
-        Store::new(&mut Engine::default(), T::default())
+        Store::new(&Engine::default(), T::default())
     }
 }
 
