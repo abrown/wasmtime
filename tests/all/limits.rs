@@ -353,7 +353,7 @@ fn test_initial_table_limits_exceeded() -> Result<()> {
 #[test]
 fn test_pooling_allocator_initial_limits_exceeded() -> Result<()> {
     let mut pool = crate::small_pool_config();
-    pool.total_memories(2)
+    pool.total_memories(4)
         .max_memories_per_module(2)
         .memory_pages(5);
     let mut config = Config::new();

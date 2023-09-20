@@ -51,6 +51,13 @@ pub fn keys() -> &'static [PkeyRef] {
 }
 static KEYS: OnceLock<Vec<PkeyRef>> = OnceLock::new();
 
+/// TODO
+pub fn allow_all() {
+    let previous = pkru::read();
+    pkru::write(pkru::ALLOW_ACCESS);
+    println!("pkru: {:#034b} => {:#034b}", previous, pkru::read());
+}
+
 /// An MPK protection key.
 ///
 /// The expected usage is:
@@ -90,6 +97,11 @@ impl Pkey {
         }
     }
 
+    // pub unsafe fn from_id(id: u32) -> Self {
+    //     assert!(id <= 15);
+    //     Self(Some(id))
+    // }
+
     /// Convert the [`Pkey`] to its 0-based index; this is useful for
     /// determining which allocation "stripe" a key belongs to.
     ///
@@ -117,9 +129,12 @@ impl Pkey {
         if let Some(key_id) = self.0 {
             // We only want to flip the `ADn` bit to `0`, which means "allow
             // access."
-            let flip_bit = 1 << (key_id * 2);
-            pkru::write(pkru::DISABLE_ACCESS ^ flip_bit);
+            let allow_key_zero = 0b11;
+            let allow_key_id = 0b11 << (key_id * 2);
+            pkru::write(pkru::DISABLE_ACCESS ^ (allow_key_zero | allow_key_id));
         }
+
+        println!("pkru: {:#034b}", pkru::read());
     }
 
     /// Allow access to all pages marked by any key.
@@ -130,11 +145,11 @@ impl Pkey {
     /// via Wasmtime's embedder API, e.g. TODO: what if keys have been allocated
     /// by other code? this would break their assumptions.
     pub fn deactivate(&self) {
-        // TODO: make sure we always allow all pkeys
-
         if self.0.is_some() {
             pkru::write(pkru::ALLOW_ACCESS);
         }
+
+        println!("pkru: {:#034b}", pkru::read());
     }
 
     /// Mark a page as protected by this [`Pkey`].
@@ -191,6 +206,8 @@ impl AsRef<Pkey> for PkeyRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Mmap;
+    use std::ffi::CStr;
 
     #[test]
     fn check_is_supported() {
@@ -219,6 +236,94 @@ mod tests {
             "failed to mark region with pkey (addr = 0x1, len = 1, prot = 0b11)"
         );
     }
+
+    static mut tripped: bool = false;
+
+    unsafe extern "C" fn handle_protection_fault(
+        sig: libc::c_int,
+        _: *mut libc::siginfo_t,
+        c: *mut libc::c_void,
+    ) {
+        // assert!(c.is_null());
+        println!("pkru: {:#034b}", pkru::read());
+        let pkey_two = keys()[2].as_ref();
+        pkey_two.deactivate();
+        println!("pkru: {:#034b}", pkru::read());
+
+        unsafe {
+            tripped = true;
+        }
+
+        let name_ptr = unsafe { libc::strsignal(sig) };
+        let name = CStr::from_ptr(name_ptr).to_str().unwrap();
+        println!("received signal: {name} ({sig})");
+        panic!("...");
+    }
+
+    #[test]
+    #[ignore]
+    fn check_protection_fault() {
+        // Set up signal handler.
+        let mut old: libc::sigaction = unsafe { std::mem::zeroed() };
+        let mut new: libc::sigaction = unsafe { std::mem::zeroed() };
+        new.sa_sigaction = handle_protection_fault as usize;
+        //new.sa_flags = libc::SA_SIGINFO | libc::SA_RESTART | libc::SA_RESETHAND;
+        // new.sa_flags = libc::SA_SIGINFO | libc::SA_NODEFER | libc::SA_ONSTACK | libc::SA_RESETHAND;
+        new.sa_flags = libc::SA_SIGINFO | libc::SA_NODEFER | libc::SA_ONSTACK;
+        // if unsafe { libc::sigaction(libc::SIGSEGV, &new, &mut old) } != 0 {
+        if unsafe { libc::sigaction(libc::SIGSEGV, &new, std::ptr::null_mut()) } != 0 {
+            panic!("unable to set up signal handler");
+            // return Err(Error::last_os_error());
+        }
+
+        let mut mmap = Mmap::with_at_least(crate::page_size()).unwrap();
+        let region = unsafe { mmap.slice_mut(0..mmap.len()) };
+        region[0] = 42;
+        assert_eq!(42, region[0]);
+
+        let pkey_one = keys()[1].as_ref();
+        let pkey_two = keys()[2].as_ref();
+        pkey_one.mark(region).unwrap();
+        println!("pkru: {:#034b}", pkru::read());
+
+        pkey_one.activate();
+        println!("pkru: {:#034b}", pkru::read());
+        assert_eq!(42, region[0]);
+
+        pkey_two.activate();
+        let caught = std::panic::catch_unwind(|| {
+            println!("pkru: {:#034b}", pkru::read());
+            assert_eq!(42, region[0]);
+        });
+
+        pkey_two.deactivate();
+        println!("pkru: {:#034b}", pkru::read());
+
+        assert_eq!(42, region[0]);
+
+        // TODO: Tear down signal handler.
+
+        // // See https://docs.rs/signal-hook-registry/1.4.0/src/signal_hook_registry/lib.rs.html#158
+        // let mut sig_action = libc::sigaction {
+        //     sa_sigaction: handle_sigint as libc::sighandler_t,
+        //     sa_mask: todo!(),
+        //     sa_flags: libc::SA_SIGINFO | libc::SA_RESTART,
+        //     sa_restorer: todo!(),
+        // };
+
+        // let pkey = Pkey::new().unwrap();
+        // let region = unsafe {
+        //     let addr = 1 as *mut u8; // this is not page-aligned!
+        //     let len = 1;
+        //     std::slice::from_raw_parts_mut(addr, len)
+        // };
+        // let result = pkey.mark(region);
+        // assert!(result.is_err());
+        // assert_eq!(
+        //     result.unwrap_err().to_string(),
+        //     "failed to mark region with pkey (addr = 0x1, len = 1, prot = 0b11)"
+        // );
+    }
 }
 
 /// Expose the `pkey_*` Linux system calls. See the kernel documentation for
@@ -231,7 +336,7 @@ mod tests {
 /// [`pkey_alloc`]: https://man7.org/linux/man-pages/man2/pkey_alloc.2.html
 /// [`pkey_mprotect`]: https://man7.org/linux/man-pages/man2/pkey_mprotect.2.html
 /// [`pkeys`]: https://man7.org/linux/man-pages/man7/pkeys.7.html
-mod sys {
+pub mod sys {
     use crate::page_size;
     use anyhow::{anyhow, Result};
 
@@ -376,12 +481,13 @@ mod pkru {
 
     /// This `PKRU` register mask disables access to any page marked with any
     /// key--in other words, no reading or writing to all pages.
-    pub const DISABLE_ACCESS: u32 = 0b01010101_01010101_01010101_01010101;
+    //pub const DISABLE_ACCESS: u32 = 0b01010101_01010101_01010101_01010101;
+    pub const DISABLE_ACCESS: u32 = 0b11111111_11111111_11111111_11111111;
     // TODO: set to all 1s?
 
     /// Read the value of the `PKRU` register.
-    #[cfg(test)]
-    fn read() -> u32 {
+    // #[cfg(test)]
+    pub(crate) fn read() -> u32 {
         // ECX must be 0 to prevent a general protection exception (#GP).
         let ecx: u32 = 0;
         let pkru: u32;

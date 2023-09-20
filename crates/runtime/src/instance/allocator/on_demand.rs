@@ -153,7 +153,7 @@ unsafe impl InstanceAllocatorImpl for OnDemandInstanceAllocator {
 
     fn purge_module(&self, _: CompiledModuleId) {}
 
-    fn get_next_pkey(&self) -> Option<PkeyRef> {
+    fn next_available_pkey(&self) -> Option<PkeyRef> {
         // The on-demand allocator cannot use protection keys--it requires
         // back-to-back allocation of memory slots that this allocator cannot
         // guarantee.

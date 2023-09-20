@@ -462,7 +462,7 @@ impl<T> Store<T> {
     /// tables created to 10,000. This can be overridden with the
     /// [`Store::limiter`] configuration method.
     pub fn new(engine: &Engine, data: T) -> Self {
-        let pkey = engine.allocator().get_next_pkey();
+        let pkey = engine.allocator().next_available_pkey();
         let mut inner = Box::new(StoreInner {
             inner: StoreOpaque {
                 _marker: marker::PhantomPinned,

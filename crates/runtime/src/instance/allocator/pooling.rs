@@ -602,8 +602,8 @@ unsafe impl InstanceAllocatorImpl for PoolingInstanceAllocator {
         self.memories.purge_module(module);
     }
 
-    fn get_next_pkey(&self) -> Option<PkeyRef> {
-        self.memories.get_next_pkey()
+    fn next_available_pkey(&self) -> Option<PkeyRef> {
+        self.memories.next_available_pkey()
     }
 }
 

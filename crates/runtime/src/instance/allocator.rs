@@ -280,7 +280,7 @@ pub unsafe trait InstanceAllocatorImpl {
     /// The pooling allocator can use memory protection keys (MPK) for
     /// compressing the guard regions protecting against OOB. Each
     /// pool-allocated store needs its own key.
-    fn get_next_pkey(&self) -> Option<PkeyRef>;
+    fn next_available_pkey(&self) -> Option<PkeyRef>;
 }
 
 /// A thing that can allocate instances.

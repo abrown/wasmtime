@@ -255,7 +255,7 @@ unsafe impl InstanceAllocatorImpl for SingleMemoryInstance<'_> {
         unreachable!()
     }
 
-    fn get_next_pkey(&self) -> Option<PkeyRef> {
+    fn next_available_pkey(&self) -> Option<PkeyRef> {
         unreachable!()
     }
 }
