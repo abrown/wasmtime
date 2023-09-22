@@ -127,10 +127,11 @@ fn run_wast(wast: &str, strategy: Strategy, pooling: bool) -> anyhow::Result<()>
         // If a wast test fails because of a limit being "exceeded" or if memory/table
         // fails to grow, the values here will need to be adjusted.
         let mut pool = PoolingAllocationConfig::default();
-        pool.total_memories(450)
+        pool.total_memories(450 * 16)
             .memory_pages(805)
             .max_memories_per_module(if multi_memory { 9 } else { 1 })
             .max_tables_per_module(4);
+        //.memory_protection_keys(AutoEnabled::Disable);
         cfg.allocation_strategy(InstanceAllocationStrategy::Pooling(pool));
         Some(lock_pooling())
     } else {
