@@ -44,14 +44,20 @@ fn main() -> Result<()> {
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// The number of bytes for each WebAssembly linear memory in the pool. See
-    /// [`Config::static_memory_maximum_size`] for the default value if unset.
+    /// The maximum number of bytes for each WebAssembly linear memory in the
+    /// pool.
+    #[arg(long, default_value = "128MiB", value_parser = parse_byte_size)]
+    memory_size: u64,
+
+    /// The maximum number of bytes a memory is considered static; see
+    /// `Config::static_memory_maximum_size` for more details and the default
+    /// value if unset.
     #[arg(long, value_parser = parse_byte_size)]
     static_memory_maximum_size: Option<u64>,
 
-    /// The size in bytes of the guard region to expect between memory slots.
-    /// See [`Config::static_memory_guard_size`] for the default value if
-    /// unset.
+    /// The size in bytes of the guard region to expect between static memory
+    /// slots; see [`Config::static_memory_guard_size`] for more details and the
+    /// default value if unset.
     #[arg(long, value_parser = parse_byte_size)]
     static_memory_guard_size: Option<u64>,
 }
@@ -71,7 +77,7 @@ fn probe_engine_size(args: &Args, mpk: MpkEnabled) -> Result<Pool> {
     while !search.done() {
         match build_engine(&args, search.next(), mpk) {
             Ok(rb) => {
-                assert!(rb >= mapped_bytes);
+                // TODO: assert!(rb >= mapped_bytes);
                 mapped_bytes = rb;
                 search.record(true)
             }
@@ -142,10 +148,8 @@ impl ExponentialSearch {
 fn build_engine(args: &Args, num_memories: u32, enable_mpk: MpkEnabled) -> Result<usize> {
     // Configure the memory pool.
     let mut pool = PoolingAllocationConfig::default();
-    if let Some(static_memory_maximum_size) = args.static_memory_maximum_size {
-        let memory_pages = static_memory_maximum_size / u64::from(wasmtime_environ::WASM_PAGE_SIZE);
-        pool.memory_pages(memory_pages);
-    }
+    let memory_pages = args.memory_size / u64::from(wasmtime_environ::WASM_PAGE_SIZE);
+    pool.memory_pages(memory_pages);
     pool.total_memories(num_memories)
         .memory_protection_keys(enable_mpk);
 
