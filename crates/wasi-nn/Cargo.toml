@@ -26,6 +26,9 @@ wasmtime = { workspace = true, features = ["component-model", "runtime"] }
 tracing = { workspace = true }
 openvino = { version = "0.6.0", features = ["runtime-linking"] }
 thiserror = { workspace = true }
+ort = { version = "2.0.0-rc.0", default-features = false, features = ["copy-dylibs", "download-binaries"]}
+lazy_static = { version = "1.4" }
+bytes = { version = "1.5" }
 
 [build-dependencies]
 walkdir = { workspace = true }
@@ -34,4 +37,5 @@ walkdir = { workspace = true }
 cap-std = { workspace = true }
 test-programs-artifacts = { workspace = true }
 wasi-common = { workspace = true, features = ["sync"] }
+wasmtime-wasi = { workspace = true, features = ["preview2"] }
 wasmtime = { workspace = true, features = ["cranelift"] }

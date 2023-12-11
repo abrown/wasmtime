@@ -16,8 +16,7 @@ const PREOPENED_DIR_NAME: &str = "fixture";
 fn run(path: &str, preload_model: bool) -> Result<()> {
     wasmtime_wasi_nn::check_test!();
     let path = Path::new(path);
-    let config = Config::new();
-    let engine = Engine::new(&config)?;
+    let engine = Engine::new(&Config::new())?;
     let mut linker = Linker::new(&engine);
     wasmtime_wasi_nn::witx::add_to_linker(&mut linker, |s: &mut Ctx| &mut s.wasi_nn)?;
     wasi_common::sync::add_to_linker(&mut linker, |s: &mut Ctx| &mut s.wasi)?;
@@ -29,11 +28,12 @@ fn run(path: &str, preload_model: bool) -> Result<()> {
     Ok(())
 }
 
-/// The host state for running wasi-nn tests.
+/// The host state for running wasi-nn  tests.
 struct Ctx {
     wasi: WasiCtx,
     wasi_nn: WasiNnCtx,
 }
+
 impl Ctx {
     fn new(preopen_dir: &Path, preload_model: bool) -> Result<Self> {
         // Create the WASI context.
@@ -46,12 +46,14 @@ impl Ctx {
 
         // Create the wasi-nn context.
         let mut openvino = backend::openvino::OpenvinoBackend::default();
+        let mut onnxruntime = backend::onnxruntime::OnnxBackend::default();
         let mut registry = InMemoryRegistry::new();
-        let mobilenet_dir = testing::artifacts_dir();
+        let fixture_dir = testing::artifacts_dir();
         if preload_model {
-            registry.load(&mut openvino, &mobilenet_dir)?;
-        }
-        let wasi_nn = WasiNnCtx::new([openvino.into()], registry.into());
+            registry.load(&mut openvino, &fixture_dir)?;
+            registry.load(&mut onnxruntime, &fixture_dir)?;
+        };
+        let wasi_nn = WasiNnCtx::new([openvino.into(), onnxruntime.into()], registry.into());
 
         Ok(Self { wasi, wasi_nn })
     }
@@ -89,4 +91,16 @@ fn nn_image_classification() {
 #[test]
 fn nn_image_classification_named() {
     run(NN_IMAGE_CLASSIFICATION_NAMED, true).unwrap()
+}
+
+#[cfg_attr(
+    not(all(
+        target_arch = "x86_64",
+        any(target_os = "linux", target_os = "windows")
+    )),
+    ignore
+)]
+#[test]
+fn nn_image_classification_onnx() {
+    run(NN_IMAGE_CLASSIFICATION_ONNX, false).unwrap()
 }
