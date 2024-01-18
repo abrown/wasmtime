@@ -2189,8 +2189,8 @@ impl PoolingAllocationConfig {
     /// The maximum number of concurrent Wasm linear memories supported (default
     /// is `1000`).
     ///
-    /// This value has a direct impact on the amount of memory allocated by the pooling
-    /// instance allocator.
+    /// This value has a direct impact on the amount of memory allocated by the
+    /// pooling instance allocator.
     ///
     /// The pooling instance allocator allocates a memory pool, where each entry
     /// in the pool contains the reserved address space for each linear memory
@@ -2245,8 +2245,8 @@ impl PoolingAllocationConfig {
     /// total_core_instances * max_core_instance_size
     /// ```
     ///
-    /// where `max_core_instance_size` is rounded up to the size and alignment of
-    /// the internal representation of the metadata.
+    /// where `max_core_instance_size` is rounded up to the size and alignment
+    /// of the internal representation of the metadata.
     pub fn total_core_instances(&mut self, count: u32) -> &mut Self {
         self.config.limits.total_core_instances = count;
         self
@@ -2280,8 +2280,8 @@ impl PoolingAllocationConfig {
     /// total_core_instances * max_core_instance_size
     /// ```
     ///
-    /// where `max_core_instance_size` is rounded up to the size and alignment of
-    /// the internal representation of the metadata.
+    /// where `max_core_instance_size` is rounded up to the size and alignment
+    /// of the internal representation of the metadata.
     pub fn max_core_instance_size(&mut self, size: usize) -> &mut Self {
         self.config.limits.core_instance_size = size;
         self

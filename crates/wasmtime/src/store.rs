@@ -1957,7 +1957,7 @@ impl AsyncCx {
         // with null to try to catch any accidental bugs on our part early.
         // This is all pretty unsafe so we're trying to be careful...
         //
-        // Note that there should be a segfaulting test  in `async_functions.rs`
+        // Note that there should be a segfaulting test in `async_functions.rs`
         // if this `Reset` is removed.
         let suspend = *self.current_suspend;
         let _reset = Reset(self.current_suspend, suspend);
