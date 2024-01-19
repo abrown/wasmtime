@@ -409,6 +409,100 @@ async fn async_host_func_with_pooling_stacks() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn async_mpk_protection() -> Result<()> {
+    let _ = env_logger::try_init();
+
+    // Construct a pool with MPK protection enabled.
+    let mut pooling = crate::small_pool_config();
+    pooling
+        .total_memories(10)
+        .total_stacks(2)
+        .memory_pages(1)
+        .table_elements(0);
+    pooling.memory_protection_keys(MpkEnabled::Enable);
+    let mut config = Config::new();
+    config.async_support(true);
+    config.allocation_strategy(InstanceAllocationStrategy::Pooling(pooling));
+    //config.dynamic_memory_guard_size(0);
+    //config.static_memory_guard_size(0);
+    config.static_memory_maximum_size(65536);
+    let engine = Engine::new(&config)?;
+
+    // To check that MPK protection is applied correctly even after async fiber
+    // switching, we run the following module in two fibers, `a` and `b`:
+    // - `a` checks its own memory
+    // - `a` suspends
+    // - `b` checks its own memory (requires a new MPK protection mask)
+    // - `b` suspends
+    // - `a` resumes and checks its memory again (requires the original MPK
+    //   mask)
+    //
+    // There are some extra checks in each fiber but
+    const WAT: &str = "
+    (module
+        (import \"\" \"\" (func))
+        (func $start
+            (drop (i32.load (i32.const 0)))
+            (call 0)
+            (drop (i32.load (i32.const 4))))
+        (memory 1)
+        (data (i32.const 0) \"\\de\\ad\\be\\ef\")
+        (data (i32.const 4) \"\\ca\\fe\\f0\\0d\")
+        (start $start))
+    ";
+
+    // We implement the suspension/resumption sequence by sending a message from
+    // one tokio thread to the other.
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
+    let engine_a = engine.clone();
+    let instance_a = tokio::spawn(async move {
+        let mut store = Store::new(&engine_a, tx);
+        let module = Module::new(store.engine(), WAT).unwrap();
+        let suspend = Func::wrap0_async(&mut store, move |caller| {
+            // Fiber `a` sends a message, waiting for `b` to close the channel.
+            let tx = caller.data().clone();
+            Box::new(async move {
+                println!("[a] suspending");
+                tx.send(()).await.unwrap();
+                println!("[a] message sent");
+                tx.closed().await;
+                println!("[a] resuming");
+            })
+        });
+        let imports = [suspend.into()];
+        Instance::new_async(&mut store, &module, &imports)
+            .await
+            .unwrap()
+    });
+    let engine_b = engine.clone();
+    let instance_b = tokio::spawn(async move {
+        let mut store = Store::new(&engine_b, Some(rx));
+        let module = Module::new(store.engine(), WAT).unwrap();
+        let suspend = Func::wrap0_async(&mut store, move |mut caller| {
+            // Fiber `b` waits for the message and immediately closes. We only
+            // expect this function to be invoked once to receive one message.
+            let mut rx = caller.data_mut().take().unwrap();
+            Box::new(async move {
+                println!("[b] suspending");
+                let _ = rx.recv().await;
+                println!("[b] received message, closing");
+                rx.close();
+                println!("[b] resuming");
+            })
+        });
+        let imports = [suspend.into()];
+        Instance::new_async(&mut store, &module, &imports)
+            .await
+            .unwrap()
+    });
+
+    // Wait for both threads to finish.
+    let _ = tokio::try_join!(instance_a, instance_b)?;
+
+    Ok(())
+}
+
 /// This will execute the `future` provided to completion and each invocation of
 /// `poll` for the future will be executed on a separate thread.
 pub async fn execute_across_threads<F>(future: F) -> F::Output
