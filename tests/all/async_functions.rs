@@ -424,81 +424,65 @@ async fn async_mpk_protection() -> Result<()> {
     let mut config = Config::new();
     config.async_support(true);
     config.allocation_strategy(InstanceAllocationStrategy::Pooling(pooling));
-    //config.dynamic_memory_guard_size(0);
-    //config.static_memory_guard_size(0);
-    config.static_memory_maximum_size(65536);
+    config.static_memory_maximum_size(1 << 26);
+    config.epoch_interruption(true);
     let engine = Engine::new(&config)?;
 
-    // To check that MPK protection is applied correctly even after async fiber
-    // switching, we run the following module in two fibers, `a` and `b`:
-    // - `a` checks its own memory
-    // - `a` suspends
-    // - `b` checks its own memory (requires a new MPK protection mask)
-    // - `b` suspends
-    // - `a` resumes and checks its memory again (requires the original MPK
-    //   mask)
-    //
-    // There are some extra checks in each fiber but
+    // Craft a module that loops for several iterations and checks whether it
+    // has access to its memory range (0x0-0x10000).
     const WAT: &str = "
     (module
-        (import \"\" \"\" (func))
         (func $start
-            (drop (i32.load (i32.const 0)))
-            (call 0)
-            (drop (i32.load (i32.const 4))))
+            (local $i i32)
+            (local.set $i (i32.const 3))
+            (loop $cont
+                (drop (i32.load (i32.const 0)))
+                (drop (i32.load (i32.const 0xfffc)))
+                (br_if $cont (local.tee $i (i32.sub (local.get $i) (i32.const 1))))))
         (memory 1)
-        (data (i32.const 0) \"\\de\\ad\\be\\ef\")
-        (data (i32.const 4) \"\\ca\\fe\\f0\\0d\")
         (start $start))
     ";
 
-    // We implement the suspension/resumption sequence by sending a message from
-    // one tokio thread to the other.
-    let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let engine_a = engine.clone();
-    let instance_a = tokio::spawn(async move {
-        let mut store = Store::new(&engine_a, tx);
+    // Start two instances of the module in separate fibers, `a` and `b`.
+    async fn run_instance(engine: &Engine, name: &str) -> Instance {
+        let mut store = Store::new(&engine, ());
+        store.set_epoch_deadline(0);
+        store.epoch_deadline_async_yield_and_update(0);
         let module = Module::new(store.engine(), WAT).unwrap();
-        let suspend = Func::wrap0_async(&mut store, move |caller| {
-            // Fiber `a` sends a message, waiting for `b` to close the channel.
-            let tx = caller.data().clone();
-            Box::new(async move {
-                println!("[a] suspending");
-                tx.send(()).await.unwrap();
-                println!("[a] message sent");
-                tx.closed().await;
-                println!("[a] resuming");
-            })
-        });
-        let imports = [suspend.into()];
-        Instance::new_async(&mut store, &module, &imports)
-            .await
-            .unwrap()
-    });
-    let engine_b = engine.clone();
-    let instance_b = tokio::spawn(async move {
-        let mut store = Store::new(&engine_b, Some(rx));
-        let module = Module::new(store.engine(), WAT).unwrap();
-        let suspend = Func::wrap0_async(&mut store, move |mut caller| {
-            // Fiber `b` waits for the message and immediately closes. We only
-            // expect this function to be invoked once to receive one message.
-            let mut rx = caller.data_mut().take().unwrap();
-            Box::new(async move {
-                println!("[b] suspending");
-                let _ = rx.recv().await;
-                println!("[b] received message, closing");
-                rx.close();
-                println!("[b] resuming");
-            })
-        });
-        let imports = [suspend.into()];
-        Instance::new_async(&mut store, &module, &imports)
-            .await
-            .unwrap()
-    });
+        println!("[{name}] building instance");
+        Instance::new_async(&mut store, &module, &[]).await.unwrap()
+    }
+    let mut a = Box::pin(run_instance(&engine, "a"));
+    let mut b = Box::pin(run_instance(&engine, "b"));
 
-    // Wait for both threads to finish.
-    let _ = tokio::try_join!(instance_a, instance_b)?;
+    // Alternately poll each instance until completion. This should exercise
+    // fiber suspensions requiring the `Store` to appropriately save and restore
+    // the PKRU context between suspensions (see `AsyncCx::block_on`).
+    for i in 0..10 {
+        if i % 2 == 0 {
+            match PollOnce::new(a).await {
+                Ok(_) => {
+                    println!("[a] done");
+                    break;
+                }
+                Err(a_) => {
+                    println!("[a] not done");
+                    a = a_;
+                }
+            }
+        } else {
+            match PollOnce::new(b).await {
+                Ok(_) => {
+                    println!("[b] done");
+                    break;
+                }
+                Err(b_) => {
+                    println!("[b] not done");
+                    b = b_;
+                }
+            }
+        }
+    }
 
     Ok(())
 }
