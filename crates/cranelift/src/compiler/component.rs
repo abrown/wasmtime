@@ -4,6 +4,7 @@ use crate::compiler::{Compiler, NativeRet};
 use anyhow::Result;
 use cranelift_codegen::ir::{self, InstBuilder, MemFlags};
 use cranelift_codegen::isa::{CallConv, TargetIsa};
+use cranelift_entity::EntityRef;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_wasm::ModuleInternedTypeIndex;
 use std::any::Any;
@@ -113,6 +114,8 @@ impl<'a> TrampolineCompiler<'a> {
             Trampoline::ResourceExitCall => {
                 self.translate_resource_libcall(host::resource_exit_call)
             }
+            Trampoline::ThreadSpawn => self.translate_thread_spawn(FuncIndex::new(0)), // TODO
+            Trampoline::ThreadHwConcurrency => self.translate_thread_hw_concurrency(),
         }
     }
 
@@ -619,6 +622,58 @@ impl<'a> TrampolineCompiler<'a> {
                 self.builder.ins().return_(&[]);
             }
         }
+    }
+
+    fn translate_thread_hw_concurrency(&mut self) {
+        let args = self.abi_load_params();
+        let vmctx = args[0];
+
+        // The arguments this shim passes along to the libcall are:
+        //
+        //   * the vmctx
+        let mut host_args = Vec::new();
+        host_args.push(vmctx);
+
+        // Currently this only support resources represented by `i32`
+        assert_eq!(self.types[self.signature].returns()[0], WasmValType::I32);
+        let (host_sig, offset) = host::thread_hw_concurrency(self.isa, &mut self.builder.func);
+
+        let host_fn = self.load_libcall(vmctx, offset);
+        let call = self
+            .builder
+            .ins()
+            .call_indirect(host_sig, host_fn, &host_args);
+        let result = self.builder.func.dfg.inst_results(call)[0];
+        self.abi_store_results(&[result]);
+    }
+
+    fn translate_thread_spawn(&mut self, thread_start: FuncIndex) {
+        let args = self.abi_load_params();
+        let vmctx = args[0];
+
+        // The arguments this shim passes along to the libcall are:
+        //
+        //   * the vmctx
+        //   * the function index to start in a new thread; TODO: use ref instead
+        let mut host_args = Vec::new();
+        host_args.push(vmctx);
+        host_args.push(
+            self.builder
+                .ins()
+                .iconst(ir::types::I32, i64::from(thread_start.as_u32())),
+        );
+
+        // Currently this only support resources represented by `i32`
+        assert_eq!(self.types[self.signature].returns()[0], WasmValType::I32);
+        let (host_sig, offset) = host::thread_spawn(self.isa, &mut self.builder.func);
+
+        let host_fn = self.load_libcall(vmctx, offset);
+        let call = self
+            .builder
+            .ins()
+            .call_indirect(host_sig, host_fn, &host_args);
+        let result = self.builder.func.dfg.inst_results(call)[0];
+        self.abi_store_results(&[result]);
     }
 }
 

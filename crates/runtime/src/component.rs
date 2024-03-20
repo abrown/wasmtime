@@ -633,6 +633,16 @@ impl ComponentInstance {
     pub(crate) fn resource_exit_call(&mut self) -> Result<()> {
         self.resource_tables().exit_call()
     }
+
+    /// Implementation of the `thread.spawn` intrinsic.
+    pub fn thread_spawn(&mut self) -> Result<u32> {
+        unimplemented!()
+    }
+
+    /// Implementation of the `thread.hw_concurrency` intrinsic.
+    pub fn thread_hw_concurrency(&mut self) -> Result<u32> {
+        Ok(1) // TODO
+    }
 }
 
 impl VMComponentContext {

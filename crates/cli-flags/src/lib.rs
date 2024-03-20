@@ -237,6 +237,8 @@ wasmtime_option_group! {
         /// Configure support for the threads proposal.
         pub threads: Option<bool>,
         /// Configure support for the memory64 proposal.
+        pub shared_everything_threads: Option<bool>,
+        /// Configure support for the memory64 proposal.
         pub memory64: Option<bool>,
         /// Configure support for the component-model proposal.
         pub component_model: Option<bool>,
@@ -628,6 +630,9 @@ impl CommonOptions {
         }
         if let Some(enable) = self.wasm.threads.or(all) {
             config.wasm_threads(enable);
+        }
+        if let Some(enable) = self.wasm.shared_everything_threads.or(all) {
+            config.wasm_shared_everything_threads(enable);
         }
         if let Some(enable) = self.wasm.multi_memory.or(all) {
             config.wasm_multi_memory(enable);

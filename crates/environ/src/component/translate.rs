@@ -185,6 +185,10 @@ enum LocalInitializer<'data> {
     ResourceRep(AliasableResourceId, ModuleInternedTypeIndex),
     ResourceDrop(AliasableResourceId, ModuleInternedTypeIndex),
 
+    // threads
+    ThreadSpawn(ModuleInternedTypeIndex),
+    ThreadHwConcurrency(ModuleInternedTypeIndex),
+
     // core wasm modules
     ModuleStatic(StaticModuleIndex),
 
@@ -513,6 +517,16 @@ impl<'a, 'data> Translator<'a, 'data> {
                             let ty = self.core_func_signature(core_func_index);
                             core_func_index += 1;
                             LocalInitializer::ResourceRep(resource, ty)
+                        }
+                        wasmparser::CanonicalFunction::ThreadSpawn { func_ty_index } => {
+                            let ty = self.core_func_signature(core_func_index);
+                            core_func_index += 1;
+                            LocalInitializer::ThreadSpawn(ty)
+                        }
+                        wasmparser::CanonicalFunction::ThreadHwConcurrency => {
+                            let ty = self.core_func_signature(core_func_index);
+                            core_func_index += 1;
+                            LocalInitializer::ThreadHwConcurrency(ty)
                         }
                     };
                     self.result.initializers.push(init);

@@ -562,6 +562,12 @@ pub enum Trampoline {
 
     /// Same as `ResourceEnterCall` except for when exiting a call.
     ResourceExitCall,
+
+    /// A `thread.spawn` intrinsic for spawning a new thread.
+    ThreadSpawn,
+
+    /// A `thread.hw_concurrency` intrinsic for returning the concurrency level.
+    ThreadHwConcurrency,
 }
 
 impl Trampoline {
@@ -589,6 +595,8 @@ impl Trampoline {
             ResourceTransferBorrow => format!("component-resource-transfer-borrow"),
             ResourceEnterCall => format!("component-resource-enter-call"),
             ResourceExitCall => format!("component-resource-exit-call"),
+            ThreadSpawn => format!("component-thread-spawn"), // TODO: add [{}] formatting
+            ThreadHwConcurrency => format!("component-thread-hw-concurrency"),
         }
     }
 }

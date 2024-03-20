@@ -185,6 +185,7 @@ struct WasmFeatures {
     simd: bool,
     tail_call: bool,
     threads: bool,
+    shared_everything_threads: bool,
     multi_memory: bool,
     exceptions: bool,
     memory64: bool,
@@ -204,6 +205,7 @@ impl Metadata<'_> {
             component_model,
             simd,
             threads,
+            shared_everything_threads,
             tail_call,
             multi_memory,
             exceptions,
@@ -239,6 +241,7 @@ impl Metadata<'_> {
                 component_model,
                 simd,
                 threads,
+                shared_everything_threads,
                 tail_call,
                 multi_memory,
                 exceptions,
@@ -442,6 +445,7 @@ impl Metadata<'_> {
             simd,
             tail_call,
             threads,
+            shared_everything_threads,
             multi_memory,
             exceptions,
             memory64,
@@ -491,6 +495,11 @@ impl Metadata<'_> {
         Self::check_bool(simd, other.simd, "WebAssembly SIMD support")?;
         Self::check_bool(tail_call, other.tail_call, "WebAssembly tail calls support")?;
         Self::check_bool(threads, other.threads, "WebAssembly threads support")?;
+        Self::check_bool(
+            shared_everything_threads,
+            other.shared_everything_threads,
+            "WebAssembly shared-everything-threads support",
+        )?;
         Self::check_bool(
             multi_memory,
             other.multi_memory,

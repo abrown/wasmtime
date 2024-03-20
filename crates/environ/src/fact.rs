@@ -256,6 +256,7 @@ impl<'a> Module<'a> {
             GlobalType {
                 val_type: ValType::I32,
                 mutable: true,
+                shared: false, // TODO
             },
             CoreDef::InstanceFlags(*instance),
         );

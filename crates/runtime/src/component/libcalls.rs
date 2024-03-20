@@ -570,3 +570,13 @@ unsafe fn resource_enter_call(vmctx: *mut VMComponentContext) -> Result<()> {
 unsafe fn resource_exit_call(vmctx: *mut VMComponentContext) -> Result<()> {
     ComponentInstance::from_vmctx(vmctx, |instance| instance.resource_exit_call())
 }
+
+unsafe fn thread_spawn(vmctx: *mut VMComponentContext, function: u32) -> Result<u32> {
+    dbg!("thread.spawn", function);
+    ComponentInstance::from_vmctx(vmctx, |instance| instance.thread_spawn())
+}
+
+unsafe fn thread_hw_concurrency(vmctx: *mut VMComponentContext) -> Result<u32> {
+    dbg!("thread.hw_concurrency");
+    ComponentInstance::from_vmctx(vmctx, |instance| instance.thread_hw_concurrency())
+}

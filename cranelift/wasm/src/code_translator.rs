@@ -1498,6 +1498,14 @@ pub fn translate_operator<FE: FuncEnvironment + ?Sized>(
         Operator::AtomicFence { .. } => {
             builder.ins().fence();
         }
+
+        Operator::GlobalAtomicGet { .. } => {
+            todo!("global.atomic.get");
+        }
+        Operator::GlobalAtomicSet { .. } => {
+            todo!("global.atomic.set");
+        }
+
         Operator::MemoryCopy { src_mem, dst_mem } => {
             let src_index = MemoryIndex::from_u32(*src_mem);
             let dst_index = MemoryIndex::from_u32(*dst_mem);

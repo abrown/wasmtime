@@ -195,7 +195,14 @@ impl WasmCoreDump {
                         wasm_encoder::ConstExpr::ref_null(wasm_encoder::HeapType::Extern)
                     }
                 };
-                globals.global(wasm_encoder::GlobalType { val_type, mutable }, &init);
+                globals.global(
+                    wasm_encoder::GlobalType {
+                        val_type,
+                        mutable,
+                        shared: false, // TODO: update coredumps with mutability
+                    },
+                    &init,
+                );
             }
             core_dump.section(&globals);
         }

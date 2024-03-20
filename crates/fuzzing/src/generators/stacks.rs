@@ -168,6 +168,7 @@ impl Stacks {
             wasm_encoder::GlobalType {
                 val_type: wasm_encoder::ValType::I32,
                 mutable: true,
+                shared: false, // TODO
             },
             &wasm_encoder::ConstExpr::i32_const(0),
         );
@@ -176,6 +177,7 @@ impl Stacks {
             wasm_encoder::GlobalType {
                 val_type: wasm_encoder::ValType::I32,
                 mutable: true,
+                shared: false, // TODO
             },
             &wasm_encoder::ConstExpr::i32_const(0),
         );

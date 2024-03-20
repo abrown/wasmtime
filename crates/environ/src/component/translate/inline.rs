@@ -672,6 +672,21 @@ impl<'a> Inliner<'a> {
                 frame.funcs.push(dfg::CoreDef::Trampoline(index));
             }
 
+            ThreadSpawn(ty) => {
+                let index = self
+                    .result
+                    .trampolines
+                    .push((*ty, dfg::Trampoline::ThreadSpawn));
+                frame.funcs.push(dfg::CoreDef::Trampoline(index));
+            }
+            ThreadHwConcurrency(ty) => {
+                let index = self
+                    .result
+                    .trampolines
+                    .push((*ty, dfg::Trampoline::ThreadHwConcurrency));
+                frame.funcs.push(dfg::CoreDef::Trampoline(index));
+            }
+
             ModuleStatic(idx) => {
                 frame.modules.push(ModuleDef::Static(*idx));
             }

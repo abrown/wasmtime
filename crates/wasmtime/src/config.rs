@@ -721,6 +721,12 @@ impl Config {
         self
     }
 
+    /// TODO
+    pub fn wasm_shared_everything_threads(&mut self, enable: bool) -> &mut Self {
+        self.features.shared_everything_threads = enable;
+        self
+    }
+
     /// Configures whether the [WebAssembly reference types proposal][proposal]
     /// will be enabled for compilation.
     ///
