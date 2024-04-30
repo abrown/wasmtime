@@ -97,6 +97,7 @@ use std::ptr;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use wasmtime_environ::demangle_function_name_or_index;
 use wasmtime_runtime::mpk::{self, ProtectionKey, ProtectionMask};
 use wasmtime_runtime::{
     Backtrace, ExportGlobal, GcHeapAllocationIndex, GcRootsList, GcStore,
@@ -2549,6 +2550,21 @@ unsafe impl<T> wasmtime_runtime::Store for StoreInner<T> {
     #[cfg(feature = "component-model")]
     fn component_calls(&mut self) -> &mut wasmtime_runtime::component::CallContexts {
         &mut self.component_calls
+    }
+
+    fn translate_pc_to_name(&self, pc: usize) -> Option<String> {
+        if let Some((info, _)) = self.modules().lookup_frame_info(pc) {
+            let mut output = String::new();
+            demangle_function_name_or_index(
+                &mut output,
+                info.func_name(),
+                info.func_index() as usize,
+            )
+            .unwrap();
+            Some(output)
+        } else {
+            None
+        }
     }
 }
 

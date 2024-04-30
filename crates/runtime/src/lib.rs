@@ -170,6 +170,10 @@ pub unsafe trait Store {
     /// Metadata required for resources for the component model.
     #[cfg(feature = "component-model")]
     fn component_calls(&mut self) -> &mut component::CallContexts;
+
+    /// Use the functionality in the top-level `Wasmtime` crate to convert raw
+    /// code addresses to their debug symbol.
+    fn translate_pc_to_name(&self, pc: usize) -> Option<String>;
 }
 
 /// Functionality required by this crate for a particular module. This

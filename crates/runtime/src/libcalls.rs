@@ -460,6 +460,10 @@ fn memory_atomic_notify(
     addr_index: u64,
     count: u32,
 ) -> Result<u32, Trap> {
+    log::trace!(
+        "backtrace@memory.atomic.notify: {:#?}",
+        get_backtrace(instance)
+    );
     let memory = MemoryIndex::from_u32(memory_index);
     instance
         .get_runtime_memory(memory)
@@ -475,6 +479,10 @@ fn memory_atomic_wait32(
     expected: u32,
     timeout: u64,
 ) -> Result<u32, Trap> {
+    log::trace!(
+        "backtrace@memory.atomic.wait32: {:#?}",
+        get_backtrace(instance)
+    );
     // convert timeout to Instant, before any wait happens on locking
     let timeout = (timeout as i64 >= 0).then(|| Instant::now() + Duration::from_nanos(timeout));
     let memory = MemoryIndex::from_u32(memory_index);
@@ -492,12 +500,30 @@ fn memory_atomic_wait64(
     expected: u64,
     timeout: u64,
 ) -> Result<u32, Trap> {
+    log::trace!(
+        "backtrace@memory.atomic.wait64: {:#?}",
+        get_backtrace(instance)
+    );
     // convert timeout to Instant, before any wait happens on locking
     let timeout = (timeout as i64 >= 0).then(|| Instant::now() + Duration::from_nanos(timeout));
     let memory = MemoryIndex::from_u32(memory_index);
     Ok(instance
         .get_runtime_memory(memory)
         .atomic_wait64(addr_index, expected, timeout)? as u32)
+}
+
+fn get_backtrace(instance: &mut Instance) -> Vec<String> {
+    let backtrace = crate::Backtrace::new(unsafe { *instance.runtime_limits() });
+    let store = unsafe { instance.store().as_ref() }.unwrap();
+    let mut functions = Vec::new();
+    for frame in backtrace.frames() {
+        if let Some(name) = store.translate_pc_to_name(frame.pc()) {
+            functions.push(name);
+        } else {
+            functions.push(format!("pc:{:?}", frame.pc()));
+        }
+    }
+    functions
 }
 
 // Hook for when an instance runs out of fuel.
