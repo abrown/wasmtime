@@ -96,6 +96,23 @@ pub mod bindings {
         raw_strings,
         skip: ["poll"],
     });
+
+    #[cfg(feature = "ml")]
+    pub mod ml {
+        wit_bindgen::generate!({
+            path: "../wasi-nn/spec/wit",
+            world: "ml",
+            std_feature,
+            raw_strings,
+            // Automatically generated bindings for these functions will allocate
+            // Vecs, which in turn pulls in the panic machinery from std, which
+            // creates vtables that end up in the wasm elem section, which we
+            // can't support in these special core-wasm adapters.
+            // Instead, we manually define the bindings for these functions in
+            // terms of raw pointers.
+            // skip: ["run", "get-environment", "poll"],
+        });
+    }
 }
 
 #[export_name = "wasi:cli/run@0.2.0#run"]
@@ -2717,5 +2734,41 @@ impl State {
             }));
         }
         self.args.get().trapping_unwrap()
+    }
+}
+
+#[cfg(feature = "ml")]
+type Graph = u32;
+
+#[cfg(feature = "ml")]
+/// TODO
+#[no_mangle]
+pub unsafe extern "C" fn load_by_name(
+    name_ptr: *const u8,
+    name_len: usize,
+    graph_ptr: *mut Graph,
+) -> Errno {
+    let name = slice::from_raw_parts(name_ptr, name_len);
+    State::with(|_state| {
+        let graph = crate::bindings::ml::wasi::nn::graph::load_by_name(name);
+        match graph {
+            Ok(graph) => {
+                *graph_ptr = graph;
+                Ok(())
+            }
+            Err(_e) => Err(ERRNO_BADF), // TODO: map error
+        }
+    })
+}
+
+pub mod wasi_ephemeral_nn {
+    #[link(wasm_import_module = "wasi_ephemeral_nn")]
+    extern "C" {
+        pub fn load(arg0: i32, arg1: i32, arg2: i32, arg3: i32, arg4: i32) -> i32;
+        pub fn load_by_name(arg0: i32, arg1: i32, arg2: i32) -> i32;
+        pub fn init_execution_context(arg0: i32, arg1: i32) -> i32;
+        pub fn set_input(arg0: i32, arg1: i32, arg2: i32) -> i32;
+        pub fn get_output(arg0: i32, arg1: i32, arg2: i32, arg3: i32, arg4: i32) -> i32;
+        pub fn compute(arg0: i32) -> i32;
     }
 }
