@@ -12,7 +12,7 @@ world ml {
     import tensor;
     import graph;
     import inference;
-    import errors;
+    import prompt;
 }
 
 /// All inputs and outputs to an ML inference are represented as `tensor`s.
@@ -61,108 +61,70 @@ interface tensor {
 /// A `graph` is a loaded instance of a specific ML model (e.g., MobileNet) for a specific ML
 /// framework (e.g., TensorFlow):
 interface graph {
-    use errors.{error};
-    use tensor.{tensor};
-    use inference.{graph-execution-context};
-
-    /// An execution graph for performing inference (i.e., a model).
-    resource graph {
-        init-execution-context: func() -> result<graph-execution-context, error>;
-    }
-
-    /// Describes the encoding of the graph. This allows the API to be implemented by various
-    /// backends that encode (i.e., serialize) their graph IR with different formats.
-    enum graph-encoding {
-        openvino,
-        onnx,
-        tensorflow,
-        pytorch,
-        tensorflowlite,
-        ggml,
-        autodetect,
-    }
-
-    /// Define where the graph should be executed.
-    enum execution-target {
-        cpu,
-        gpu,
-        tpu
-    }
-
-    /// The graph initialization data.
-    ///
-    /// This gets bundled up into an array of buffers because implementing backends may encode their
-    /// graph IR in parts (e.g., OpenVINO stores its IR and weights separately).
-    type graph-builder = list<u8>;
-
-    /// Load a `graph` from an opaque sequence of bytes to use for inference.
-    load: func(builder: list<graph-builder>, encoding: graph-encoding, target: execution-target) -> result<graph, error>;
-
     /// Load a `graph` by name.
     ///
     /// How the host expects the names to be passed and how it stores the graphs for retrieval via
     /// this function is **implementation-specific**. This allows hosts to choose name schemes that
     /// range from simple to complex (e.g., URLs?) and caching mechanisms of various kinds.
-    load-by-name: func(name: string) -> result<graph, error>;
-}
+    load: func(name: string) -> result<graph, string>;
 
-/// An inference "session" is encapsulated by a `graph-execution-context`. This structure binds a
-/// `graph` to input tensors before `compute`-ing an inference:
-interface inference {
-    use errors.{error};
-    use tensor.{tensor, tensor-data};
-
-    /// Bind a `graph` to the input and output tensors for an inference.
-    ///
-    /// TODO: this may no longer be necessary in WIT
-    /// (https://github.com/WebAssembly/wasi-nn/issues/43)
-    resource graph-execution-context {
-        /// Define the inputs to use for inference.
-        set-input: func(name: string, tensor: tensor) -> result<_, error>;
-
-        /// Compute the inference on the given inputs.
+    /// An execution graph for performing inference (i.e., a model).
+    resource graph {
+        /// Retrieve the properties of the graph.
         ///
-        /// Note the expected sequence of calls: `set-input`, `compute`, `get-output`. TODO: this
-        /// expectation could be removed as a part of
-        /// https://github.com/WebAssembly/wasi-nn/issues/43.
-        compute: func() -> result<_, error>;
+        /// These are metadata about the graph, unique to the graph and the
+        /// ML backend providing it.
+        list-properties: func() -> list<string>;
 
-        /// Extract the outputs after inference.
-        get-output: func(name: string) -> result<tensor, error>;
+        /// Retrieve the value of a property.
+        ///
+        /// If the property does not exist, this function returns `none`.
+        get-property: func(name: string) -> option<string>;
+
+        /// Modify the value of a property.
+        ///
+        /// If the operation fails, this function returns a string from the ML
+        /// backend describing the error.
+        set-property: func(name: string, value: string) -> result<_, string>;
     }
 }
 
-/// TODO: create function-specific errors (https://github.com/WebAssembly/wasi-nn/issues/42)
-interface errors {
-    enum error-code {
-        // Caller module passed an invalid argument.
-        invalid-argument,
-        // Invalid encoding.
-        invalid-encoding,
-        // The operation timed out.
-        timeout,
-        // Runtime Error.
-        runtime-error,
-        // Unsupported operation.
-        unsupported-operation,
-        // Graph is too large.
-        too-large,
-        // Graph not found.
-        not-found,
-        // The operation is insecure or has insufficient privilege to be performed.
-        // e.g., cannot access a hardware feature requested
-        security,
-        // The operation failed for an unspecified reason.
-        unknown
+/// An inference "session" is encapsulated by a `context`; use this to `compute`
+/// an inference.
+interface inference {
+    use graph.{graph};
+    use tensor.{tensor};
+
+    /// Initialize an inference session with a graph.
+    ///
+    /// Note that not all graphs are inference-ready (see `prompt`); this
+    /// function may fail in this case.
+    init: func(graph: graph) -> result<context, string>;
+
+    /// Identify a tensor by name; this is necessary to associate tensors to
+    /// graph inputs and outputs.
+    type named-tensor = tuple<string, tensor>;
+
+    /// An inference "session."
+    resource context {
+        /// Compute an inference request with the given inputs.
+        compute: func(inputs: list<named-tensor>) -> result<list<named-tensor>, string>;
     }
+}
 
-    resource error {
-        constructor(code: error-code, data: string);
+/// A prompt "session" is encapsulated by a `context`.
+interface prompt {
+    use graph.{graph};
 
-        /// Return the error code.
-        code: func() -> error-code;
+    /// Initialize a prompt session with a graph.
+    ///
+    /// Note that not all graphs are prompt-ready (see `inference`); this
+    /// function may fail in this case.
+    init: func(graph: graph) -> result<context, string>;
 
-        /// Errors can propagated with backend specific status through a string value.
-        data: func() -> string;
+    /// A prompt "session."
+    resource context {
+        /// Compute an inference request with the given inputs.
+        compute: func(prompt: string) -> result<string, string>;
     }
 }
