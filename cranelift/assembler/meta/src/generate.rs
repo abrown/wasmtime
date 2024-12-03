@@ -38,7 +38,7 @@ fn generate_inst_enum(f: &mut Formatter, insts: &[dsl::Inst]) {
 
 /// `#[derive(...)]`
 fn generate_derive(f: &mut Formatter) {
-    f.line("#[derive(arbitrary::Arbitrary, Debug)]", None);
+    f.line("#[derive(arbitrary::Arbitrary, Clone, Debug)]", None);
 }
 
 /// `impl std::fmt::Display for Inst { ... }`
