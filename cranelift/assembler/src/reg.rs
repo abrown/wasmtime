@@ -28,6 +28,10 @@ impl Gpr {
         Self(u32::from(enc))
     }
 
+    pub fn as_mut(&mut self) -> &mut u32 {
+        &mut self.0
+    }
+
     pub fn enc(&self) -> u8 {
         self.0.try_into().expect("invalid register")
     }
@@ -144,12 +148,12 @@ impl Gpr {
 
     pub fn read(&mut self, visitor: &mut impl RegallocVisitor) {
         // TODO: allow regalloc to replace a virtual register with a real one.
-        visitor.read(self.enc());
+        visitor.read(self.as_mut());
     }
 
     pub fn read_write(&mut self, visitor: &mut impl RegallocVisitor) {
         // TODO: allow regalloc to replace a virtual register with a real one.
-        visitor.read_write(self.enc());
+        visitor.read_write(self.as_mut());
     }
 }
 
@@ -171,6 +175,9 @@ pub enum Size {
 pub struct Gpr2MinusRsp(Gpr);
 
 impl Gpr2MinusRsp {
+    pub fn as_mut(&mut self) -> &mut u32 {
+        self.0.as_mut()
+    }
     pub fn enc(&self) -> u8 {
         self.0.enc()
     }

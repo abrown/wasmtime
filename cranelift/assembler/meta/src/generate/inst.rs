@@ -43,10 +43,16 @@ impl dsl::Inst {
         fmtln!(f, "Self::{variant_name}(i) => write!(f, \"{{i}}\"),");
     }
 
-    // `Self::<inst>(i) => i.encode(b),`
+    // `Self::<inst>(i) => i.encode(b, o),`
     pub fn generate_variant_encode(&self, f: &mut Formatter) {
         let variant_name = self.struct_name();
         fmtln!(f, "Self::{variant_name}(i) => i.encode(b, o),");
+    }
+
+    // `Self::<inst>(i) => i.regalloc(v),`
+    pub fn generate_variant_regalloc(&self, f: &mut Formatter) {
+        let variant_name = self.struct_name();
+        fmtln!(f, "Self::{variant_name}(i) => i.regalloc(v),");
     }
 
     /// `impl <inst> { ... }`
@@ -113,7 +119,7 @@ impl dsl::Inst {
                         let Some(fixed) = o.location.generate_fixed_reg() else {
                             unreachable!()
                         };
-                        fmtln!(f, "visitor.fixed_{call}({fixed}.enc());");
+                        fmtln!(f, "visitor.fixed_{call}({fixed}.as_mut());");
                     }
                     Reg(reg) => {
                         let call = o.mutability.generate_regalloc_call();

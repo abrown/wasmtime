@@ -7,7 +7,7 @@ use crate::rex::{encode_modrm, encode_sib, Imm, RexFlags};
 use crate::sink::{CodeSink, KnownOffsetTable, Label, TrapCode};
 use arbitrary::Arbitrary;
 
-#[derive(Clone, Debug, Arbitrary)]
+#[derive(Arbitrary, Clone, Debug)]
 pub enum Amode {
     ImmReg {
         base: Gpr,
@@ -56,21 +56,18 @@ impl Amode {
             Amode::ImmReg { base, .. } => {
                 // TODO: allow regalloc to replace a virtual register with a real one.
                 // TODO: should this be a debug_assert instead, like below?
-                let base = base.enc();
-                if base != reg::ENC_RBP && base != reg::ENC_RSP {
-                    visitor.read(base);
+                if base.enc() != reg::ENC_RBP && base.enc() != reg::ENC_RSP {
+                    visitor.read(base.as_mut());
                 }
             }
             Amode::ImmRegRegShift { base, index, .. } => {
                 // TODO: allow regalloc to replace a virtual register with a real one.
-                let base = base.enc();
-                debug_assert_ne!(base, reg::ENC_RBP);
-                debug_assert_ne!(base, reg::ENC_RSP);
-                visitor.read(base);
-                let index = index.enc();
-                debug_assert_ne!(index, reg::ENC_RBP);
-                debug_assert_ne!(index, reg::ENC_RSP);
-                visitor.read(index);
+                debug_assert_ne!(base.enc(), reg::ENC_RBP);
+                debug_assert_ne!(base.enc(), reg::ENC_RSP);
+                visitor.read(base.as_mut());
+                debug_assert_ne!(index.enc(), reg::ENC_RBP);
+                debug_assert_ne!(index.enc(), reg::ENC_RSP);
+                visitor.read(index.as_mut());
             }
             Amode::RipRelative { .. } => todo!(),
         }
@@ -110,7 +107,7 @@ impl std::fmt::Display for Amode {
     }
 }
 
-#[derive(Clone, Debug, Arbitrary)]
+#[derive(Arbitrary, Clone, Debug)]
 pub enum Scale {
     One,
     Two,
@@ -131,7 +128,7 @@ impl Scale {
     }
 }
 
-#[derive(Debug, Arbitrary)]
+#[derive(Arbitrary, Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum GprMem {
     Gpr(Gpr),
@@ -233,12 +230,13 @@ pub fn emit_modrm_sib_disp(
             imm.emit(sink);
         }
 
-        Amode::RipRelative { target: _ } => {
+        Amode::RipRelative { target } => {
             // RIP-relative is mod=00, rm=101.
             sink.put1(encode_modrm(0b00, enc_g & 7, 0b101));
 
-            let _offset = sink.cur_offset();
-            // TODO sink.use_label_at_offset(offset, *target, LabelUse::JmpRel32);
+            let offset = sink.cur_offset();
+            sink.use_label_at_offset(offset, target.clone());
+
             // N.B.: some instructions (XmmRmRImm format for example)
             // have bytes *after* the RIP-relative offset. The
             // addressed location is relative to the end of the

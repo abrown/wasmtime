@@ -24,7 +24,7 @@ pub trait CodeSink {
 
     /// TODO: I would prefer to keep this away from this trait (but see how
     /// `Amode::RipRelative` is lowered).
-    fn use_label_at_offset<LU>(&mut self, offset: u32, label: Label, kind: LU);
+    fn use_label_at_offset(&mut self, offset: u32, label: Label);
 
     /// TODO: I would prefer to keep this away from this trait (but see
     /// how we lower `Amode`).
@@ -59,7 +59,7 @@ impl CodeSink for Vec<u8> {
         self.len().try_into().unwrap()
     }
 
-    fn use_label_at_offset<LU>(&mut self, _: u32, _: Label, _: LU) {}
+    fn use_label_at_offset(&mut self, _: u32, _: Label) {}
 
     fn add_trap(&mut self, _: TrapCode) {}
 }
@@ -75,6 +75,7 @@ impl CodeSink for Vec<u8> {
 /// `KnownOffset`.
 pub trait KnownOffsetTable: Index<KnownOffset, Output = i32> {}
 impl KnownOffsetTable for Vec<i32> {}
+impl KnownOffsetTable for [i32; 0] {}
 
 /// A `KnownOffset` is a unique identifier for a specific offset known only at
 /// emission time.

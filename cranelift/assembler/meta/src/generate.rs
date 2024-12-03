@@ -12,7 +12,7 @@ pub fn generate(f: &mut Formatter, insts: &[dsl::Inst]) {
     // Generate "all instructions" enum.
     generate_inst_enum(f, insts);
     generate_inst_display_impl(f, insts);
-    generate_inst_encode_impl(f, insts);
+    generate_inst_impl(f, insts);
 
     // Generate per-instruction structs.
     f.empty_line();
@@ -61,7 +61,7 @@ fn generate_inst_display_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
 }
 
 /// `impl Inst { ... }`
-fn generate_inst_encode_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
+fn generate_inst_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
     fmtln!(f, "impl Inst {{");
     f.indent(|f| {
         fmtln!(f, "pub fn encode(&self, b: &mut impl CodeSink, o: &impl KnownOffsetTable) {{");
@@ -70,6 +70,19 @@ fn generate_inst_encode_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
             f.indent_push();
             for inst in insts {
                 inst.generate_variant_encode(f);
+            }
+            f.indent_pop();
+            fmtln!(f, "}}");
+        });
+        fmtln!(f, "}}");
+    });
+    f.indent(|f| {
+        fmtln!(f, "pub fn regalloc(&mut self, v: &mut impl RegallocVisitor) {{");
+        f.indent(|f| {
+            fmtln!(f, "match self {{");
+            f.indent_push();
+            for inst in insts {
+                inst.generate_variant_regalloc(f);
             }
             f.indent_pop();
             fmtln!(f, "}}");
