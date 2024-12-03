@@ -736,6 +736,7 @@ dependencies = [
  "arbitrary",
  "bumpalo",
  "capstone",
+ "cranelift-assembler",
  "cranelift-bforest",
  "cranelift-bitset",
  "cranelift-codegen-meta",

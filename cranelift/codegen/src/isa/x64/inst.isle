@@ -812,7 +812,10 @@
        (Unwind (inst UnwindInst))
 
        ;; A pseudoinstruction that just keeps a value alive.
-       (DummyUse (reg Reg))))
+       (DummyUse (reg Reg))
+
+       ;; An instruction assembled outside of cranelift-codegen.
+       (External (inst AssemblerInst))))
 
 (type OperandSize extern
       (enum Size8
@@ -834,6 +837,8 @@
 (type BoxReturnCallInfo extern (enum))
 (type BoxReturnCallIndInfo extern (enum))
 (type BoxSyntheticAmode extern (enum))
+
+(type AssemblerInst extern (enum))
 
 (decl pure box_synthetic_amode (SyntheticAmode) BoxSyntheticAmode)
 (extern constructor box_synthetic_amode box_synthetic_amode)

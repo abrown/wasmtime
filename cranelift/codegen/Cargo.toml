@@ -25,6 +25,7 @@ arbitrary = { version = "1.3.2", features = ["derive"] }
 anyhow = { workspace = true, optional = true, features = ['std'] }
 bumpalo = "3"
 capstone = { workspace = true, optional = true }
+cranelift-assembler = { path = "../assembler", version = "0.1.0" }
 cranelift-codegen-shared = { path = "./shared", version = "0.115.0" }
 cranelift-entity = { workspace = true }
 cranelift-bforest = { workspace = true }

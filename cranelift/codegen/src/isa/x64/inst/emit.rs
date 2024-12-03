@@ -54,6 +54,48 @@ fn emit_reloc(sink: &mut MachBuffer<Inst>, kind: Reloc, name: &ExternalName, add
     sink.add_reloc(kind, name, addend);
 }
 
+impl cranelift_assembler::CodeSink for MachBuffer<Inst> {
+    fn put1(&mut self, value: u8) {
+        self.put1(value)
+    }
+
+    fn put2(&mut self, value: u16) {
+        self.put2(value)
+    }
+
+    fn put4(&mut self, value: u32) {
+        self.put4(value)
+    }
+
+    fn put8(&mut self, value: u64) {
+        self.put8(value)
+    }
+
+    fn cur_offset(&self) -> u32 {
+        self.cur_offset()
+    }
+
+    fn use_label_at_offset(&mut self, offset: u32, label: cranelift_assembler::Label) {
+        self.use_label_at_offset(offset, label.into(), LabelUse::JmpRel32);
+    }
+
+    fn add_trap(&mut self, code: cranelift_assembler::TrapCode) {
+        self.add_trap(code.into());
+    }
+}
+
+impl From<cranelift_assembler::TrapCode> for TrapCode {
+    fn from(value: cranelift_assembler::TrapCode) -> Self {
+        Self::from_raw(value.0)
+    }
+}
+
+impl From<cranelift_assembler::Label> for MachLabel {
+    fn from(value: cranelift_assembler::Label) -> Self {
+        Self::from_u32(value.0)
+    }
+}
+
 /// The top-level emit function.
 ///
 /// Important!  Do not add improved (shortened) encoding cases to existing
@@ -145,6 +187,9 @@ pub(crate) fn emit(
     }
 
     match inst {
+        Inst::External { inst } => {
+            inst.encode(sink, &[]);
+        }
         Inst::AluRmiR {
             size,
             op,

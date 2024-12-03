@@ -23,6 +23,7 @@ use crate::machinst::{
     VCodeConstantData,
 };
 use alloc::vec::Vec;
+use cranelift_assembler::Inst as AssemblerInst;
 use regalloc2::PReg;
 use std::boxed::Box;
 

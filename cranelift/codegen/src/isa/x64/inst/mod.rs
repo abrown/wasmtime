@@ -11,6 +11,7 @@ use crate::isa::{CallConv, FunctionAlignment};
 use crate::{machinst::*, trace};
 use crate::{settings, CodegenError, CodegenResult};
 use alloc::boxed::Box;
+use regalloc2::VReg;
 use smallvec::{smallvec, SmallVec};
 use std::fmt::{self, Write};
 use std::string::{String, ToString};
@@ -187,6 +188,10 @@ impl Inst {
             | Inst::XmmCmpRmRVex { op, .. } => op.available_from(),
 
             Inst::MulX { .. } => smallvec![InstructionSet::BMI2],
+
+            Inst::External { inst } => {
+                todo!()
+            }
         }
     }
 }
@@ -1956,6 +1961,10 @@ impl PrettyPrint for Inst {
                 let reg = pretty_print_reg(*reg, 8);
                 format!("dummy_use {reg}")
             }
+
+            Inst::External { inst } => {
+                format!("{inst}")
+            }
         }
     }
 }
@@ -1963,6 +1972,46 @@ impl PrettyPrint for Inst {
 impl fmt::Debug for Inst {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}", self.pretty_print_inst(&mut Default::default()))
+    }
+}
+
+/// A wrapper to implement the `cranelift-assembler` register allocation trait,
+/// `RegallocVisitor`, in terms of the trait used here, `OperandVisitor`.
+struct AssemblerRegallocVisitor<'a, T>
+where
+    T: OperandVisitor,
+{
+    collector: &'a mut T,
+}
+
+impl<'a, T: OperandVisitor> cranelift_assembler::RegallocVisitor
+    for AssemblerRegallocVisitor<'a, T>
+{
+    fn read(&mut self, original: &mut u32) {
+        use regalloc2::{OperandConstraint, OperandKind::Use, OperandPos::Early, RegClass};
+        let vreg = VReg::new(*original as usize, RegClass::Int);
+        let mut reg = Reg::from(vreg);
+        self.collector
+            .add_operand(&mut reg, OperandConstraint::Reg, Use, Early);
+        if let Some(real) = reg.to_real_reg() {
+            *original = real.hw_enc() as u32;
+        } else if let Some(virt) = reg.to_virtual_reg() {
+            *original = virt.index() as u32;
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn read_write(&mut self, _reg: &mut u32) {
+        todo!()
+    }
+
+    fn fixed_read(&mut self, _reg: &mut u32) {
+        todo!()
+    }
+
+    fn fixed_read_write(&mut self, _reg: &mut u32) {
+        todo!()
     }
 }
 
@@ -2701,6 +2750,10 @@ fn x64_get_operands(inst: &mut Inst, collector: &mut impl OperandVisitor) {
 
         Inst::DummyUse { reg } => {
             collector.reg_use(reg);
+        }
+
+        Inst::External { inst } => {
+            inst.regalloc(&mut AssemblerRegallocVisitor { collector });
         }
     }
 }
