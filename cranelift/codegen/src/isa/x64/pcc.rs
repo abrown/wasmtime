@@ -980,8 +980,8 @@ pub(crate) fn check(
 
         Inst::StackSwitchBasic { .. } => Err(PccError::UnimplementedInst),
 
-        Inst::External { ref inst } => {
-            todo!()
+        Inst::External { .. } => {
+            todo!("external instructions are not yet supported")
         }
     }
 }
