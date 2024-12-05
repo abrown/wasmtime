@@ -20,10 +20,14 @@ macro_rules! maybe_print_hex {
     };
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Arbitrary, Clone, Copy, Debug)]
 pub struct Imm8(u8);
 
 impl Imm8 {
+    pub fn new(value: u8) -> Self {
+        Self(value)
+    }
+
     #[must_use]
     pub fn value(&self) -> u8 {
         self.0
