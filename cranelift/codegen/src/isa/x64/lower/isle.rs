@@ -23,8 +23,11 @@ use crate::machinst::{
     VCodeConstantData,
 };
 use alloc::vec::Vec;
+use cranelift_assembler::Gpr as AssemblerGpr;
+use cranelift_assembler::GprMem as AssemblerGprMem;
+use cranelift_assembler::Imm8 as AssemblerImm8;
 use cranelift_assembler::Inst as AssemblerInst;
-use regalloc2::PReg;
+use regalloc2::{PReg, RegClass, VReg};
 use std::boxed::Box;
 
 /// Type representing out-of-line data for calls. This type optional because the
@@ -940,6 +943,54 @@ impl Context for IsleContext<'_, '_, MInst, X64Backend> {
 
     fn box_synthetic_amode(&mut self, amode: &SyntheticAmode) -> BoxSyntheticAmode {
         Box::new(amode.clone())
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    ///// External assembler methods.
+    ////////////////////////////////////////////////////////////////////////////
+
+    fn is_imm(&mut self, src: &GprMemImm) -> Option<GprMemImm> {
+        match src.clone().to_reg_mem_imm() {
+            RegMemImm::Imm { .. } => Some(src.clone()),
+            _ => None,
+        }
+    }
+
+    fn to_assembler_gpr(&mut self, gpr: Gpr) -> AssemblerGpr {
+        if let Some(real) = gpr.to_reg().to_real_reg() {
+            AssemblerGpr::new(real.hw_enc() as u32)
+        } else if let Some(virt) = gpr.to_reg().to_virtual_reg() {
+            AssemblerGpr::new(virt.index() as u32)
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn from_assembler_gpr(&mut self, gpr: &AssemblerGpr) -> Gpr {
+        let vreg = VReg::new(gpr.as_u32() as usize, RegClass::Int);
+        Gpr::unwrap_new(vreg.into())
+    }
+
+    fn to_assembler_imm8(&mut self, imm: &GprMemImm) -> AssemblerImm8 {
+        if let RegMemImm::Imm { simm32 } = imm.clone().to_reg_mem_imm() {
+            assert!(simm32 <= u8::MAX as u32);
+            AssemblerImm8::new(simm32 as u8)
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn from_assembler_imm8(&mut self, imm: &AssemblerImm8) -> GprMemImm {
+        GprMemImm::unwrap_new(RegMemImm::Imm {
+            simm32: imm.value() as u32,
+        })
+    }
+
+    fn assemble_andb_mi(&mut self, rm8: &AssemblerGpr, imm8: &AssemblerImm8) -> AssemblerInst {
+        AssemblerInst::andb_mi(cranelift_assembler::andb_mi {
+            rm8: AssemblerGprMem::Gpr(*rm8),
+            imm8: *imm8,
+        })
     }
 }
 

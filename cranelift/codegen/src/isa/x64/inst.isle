@@ -838,11 +838,30 @@
 (type BoxReturnCallIndInfo extern (enum))
 (type BoxSyntheticAmode extern (enum))
 
-(type AssemblerInst extern (enum))
-
 (decl pure box_synthetic_amode (SyntheticAmode) BoxSyntheticAmode)
 (extern constructor box_synthetic_amode box_synthetic_amode)
 (convert SyntheticAmode BoxSyntheticAmode box_synthetic_amode)
+
+;; Interface with assembler types.
+(type AssemblerInst extern (enum))
+(type AssemblerGpr extern (enum))
+(type AssemblerImm8 extern (enum))
+
+(decl pure to_assembler_gpr (Gpr) AssemblerGpr)
+(extern constructor to_assembler_gpr to_assembler_gpr)
+(convert Gpr AssemblerGpr to_assembler_gpr)
+
+(decl pure from_assembler_gpr (AssemblerGpr) Gpr)
+(extern constructor from_assembler_gpr from_assembler_gpr)
+(convert AssemblerGpr Gpr from_assembler_gpr)
+
+(decl pure to_assembler_imm8 (GprMemImm) AssemblerImm8)
+(extern constructor to_assembler_imm8 to_assembler_imm8)
+(convert GprMemImm AssemblerImm8 to_assembler_imm8)
+
+(decl pure from_assembler_imm8 (AssemblerImm8) GprMemImm)
+(extern constructor from_assembler_imm8 from_assembler_imm8)
+(convert AssemblerImm8 GprMemImm from_assembler_imm8)
 
 ;; Get the `OperandSize` for a given `Type`, rounding smaller types up to 32 bits.
 (decl operand_size_of_type_32_64 (Type) OperandSize)
@@ -2905,11 +2924,25 @@
 
 ;; Helper for emitting `and` instructions.
 (decl x64_and (Type Gpr GprMemImm) Gpr)
-(rule (x64_and ty src1 src2)
+(rule 1 (x64_and $I8 src1 (is_imm src2)) (x64_andb_mi src1 src2))
+;; (rule 1 (x64_and $I16 src1 (is_imm src2)) (x64_andw_mi src1 src2))
+;; (rule 1 (x64_and $I32 src1 (is_imm src2)) (x64_andl_mi src1 src2))
+;; (rule 1 (x64_and $I64 src1 (is_imm src2)) (x64_andq_mi src1 src2))
+(rule 0 (x64_and ty src1 src2)
       (alu_rmi_r ty
                  (AluRmiROpcode.And)
                  src1
                  src2))
+
+(extern extractor is_imm is_imm)
+(decl is_imm (GprMemImm) GprMemImm)
+
+(decl x64_andb_mi (AssemblerGpr AssemblerImm8) AssemblerGpr)
+(rule (x64_andb_mi rm8 imm8)
+      (let ((_ Unit (emit (MInst.External (assemble_andb_mi rm8 imm8)))))
+        rm8))
+(decl assemble_andb_mi (AssemblerGpr AssemblerImm8) AssemblerInst)
+(extern constructor assemble_andb_mi assemble_andb_mi)
 
 (decl x64_and_with_flags_paired (Type Gpr GprMemImm) ProducesFlags)
 (rule (x64_and_with_flags_paired ty src1 src2)

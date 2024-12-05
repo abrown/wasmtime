@@ -190,7 +190,9 @@ impl Inst {
             Inst::MulX { .. } => smallvec![InstructionSet::BMI2],
 
             Inst::External { inst } => {
-                todo!()
+                // TODO: pass on the available ISA sets from the external
+                // instruction.
+                smallvec![]
             }
         }
     }
@@ -1987,23 +1989,17 @@ where
 impl<'a, T: OperandVisitor> cranelift_assembler::RegallocVisitor
     for AssemblerRegallocVisitor<'a, T>
 {
-    fn read(&mut self, original: &mut u32) {
-        use regalloc2::{OperandConstraint, OperandKind::Use, OperandPos::Early, RegClass};
-        let vreg = VReg::new(*original as usize, RegClass::Int);
-        let mut reg = Reg::from(vreg);
-        self.collector
-            .add_operand(&mut reg, OperandConstraint::Reg, Use, Early);
-        if let Some(real) = reg.to_real_reg() {
-            *original = real.hw_enc() as u32;
-        } else if let Some(virt) = reg.to_virtual_reg() {
-            *original = virt.index() as u32;
-        } else {
-            unreachable!()
-        }
+    fn read(&mut self, reg: &mut u32) {
+        use regalloc2::{OperandConstraint::Reg, OperandKind::Use, OperandPos::Early};
+        roundtrip_assembler_gpr(reg, |r| self.collector.add_operand(r, Reg, Use, Early));
     }
 
-    fn read_write(&mut self, _reg: &mut u32) {
-        todo!()
+    fn read_write(&mut self, reg: &mut u32) {
+        use regalloc2::{OperandConstraint::Reg, OperandKind::Use, OperandPos::Early};
+        // TODO: it's unclear if this is correct: we `rw` operands are indeed
+        // read "early" but it's unclear whether we need to also tell regalloc2
+        // that they are also written "late."
+        roundtrip_assembler_gpr(reg, |r| self.collector.add_operand(r, Reg, Use, Early));
     }
 
     fn fixed_read(&mut self, _reg: &mut u32) {
@@ -2012,6 +2008,23 @@ impl<'a, T: OperandVisitor> cranelift_assembler::RegallocVisitor
 
     fn fixed_read_write(&mut self, _reg: &mut u32) {
         todo!()
+    }
+}
+
+/// An unfortunate helper function for converting the raw `u32` of an assembler
+/// register from and to a regalloc2-`Reg`. It's unfortunate because it uses a
+/// bunch of conversions that are not truly necessary.
+fn roundtrip_assembler_gpr(asm: &mut u32, mut collect: impl FnMut(&mut Reg) -> ()) {
+    use regalloc2::RegClass;
+    let vreg = VReg::new(*asm as usize, RegClass::Int);
+    let mut reg = Reg::from(vreg);
+    collect(&mut reg);
+    if let Some(real) = reg.to_real_reg() {
+        *asm = real.hw_enc() as u32;
+    } else if let Some(virt) = reg.to_virtual_reg() {
+        *asm = virt.index() as u32;
+    } else {
+        unreachable!()
     }
 }
 
