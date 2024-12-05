@@ -28,35 +28,10 @@ impl dsl::Inst {
     /// `<class name>_<format name>`
     #[must_use]
     fn struct_name(&self) -> String {
-        format!(
-            "{}_{}_{}",
-            self.name.to_lowercase(),
-            self.format.name.to_lowercase(),
-            self.immediate_name()
-        )
+        format!("{}_{}", self.name.to_lowercase(), self.format.name.to_lowercase())
     }
 
-    #[must_use]
-    fn immediate_name(&self) -> String {
-        self.format
-            .operands_by_kind()
-            .iter()
-            .find(|op| match op {
-                dsl::format::OperandKind::Imm(_) => true,
-                _ => false,
-            })
-            .map_or_else(
-                || String::new(),
-                |op| match op {
-                    dsl::format::OperandKind::Imm(dsl::Location::imm8) => "ib".to_string(),
-                    dsl::format::OperandKind::Imm(dsl::Location::imm16) => "iw".to_string(),
-                    dsl::format::OperandKind::Imm(dsl::Location::imm32) => "id".to_string(),
-                    _ => "".to_string(),
-                },
-            )
-    }
-
-    /// `<inst>_<immediate_name>(<inst>),`
+    /// `<inst>(<inst>),`
     pub fn generate_enum_variant(&self, f: &mut Formatter) {
         let variant_name = self.struct_name();
         fmtln!(f, "{variant_name}({variant_name}),");
