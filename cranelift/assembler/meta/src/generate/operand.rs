@@ -53,7 +53,7 @@ impl dsl::Location {
     pub fn generate_fixed_reg(&self) -> Option<&str> {
         use dsl::Location::*;
         match self {
-            al | ax | eax | rax => Some("Gpr::new(reg::ENC_RAX)"),
+            al | ax | eax | rax => Some("Gpr::new(reg::ENC_RAX.into())"),
             imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | rm8 | rm16 | rm32 | rm64 => None,
         }
     }

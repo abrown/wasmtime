@@ -20,19 +20,26 @@ pub const ENC_R13: u8 = 13;
 pub const ENC_R14: u8 = 14;
 pub const ENC_R15: u8 = 15;
 
-#[derive(Clone, Debug)]
+/// A general purpose x64 register (e.g., `%rax`).
+///
+/// This holds a larger value than needed to accommodate register allocation.
+/// Cranelift's register allocator expects to modify an instruction's operands
+/// in place (see [`Gpr::as_mut`]); Cranelift assigns a virtual register to each
+/// operand and only later replaces these with true HW registers. A consequence:
+/// register allocation _must happen_ before encoding the register (see
+/// [`Gpr::enc`]).
+#[derive(Clone, Copy, Debug)]
 pub struct Gpr(pub(crate) u32);
-impl Gpr {
-    pub fn new(enc: u8) -> Self {
-        assert!(enc < 16, "invalid register: {enc}");
-        Self(u32::from(enc))
-    }
 
-    pub fn as_mut(&mut self) -> &mut u32 {
-        &mut self.0
+impl Gpr {
+    /// Create a [`Gpr`] that may be real (emit-able in machine code) or virtual
+    /// (waiting for register allocation).
+    pub fn new(index: u32) -> Self {
+        Self(index)
     }
 
     pub fn enc(&self) -> u8 {
+        assert!(self.0 < 16, "invalid register: {}", self.0);
         self.0.try_into().expect("invalid register")
     }
 
@@ -142,18 +149,26 @@ impl Gpr {
                 Doubleword => "%r15d",
                 Quadword => "%r15",
             },
-            _ => panic!("invalid reg: {}", self.0),
+            _ => panic!("%invalid{}", self.0), // TODO: print instead?
         }
     }
 
     pub fn read(&mut self, visitor: &mut impl RegallocVisitor) {
-        // TODO: allow regalloc to replace a virtual register with a real one.
         visitor.read(self.as_mut());
     }
 
     pub fn read_write(&mut self, visitor: &mut impl RegallocVisitor) {
-        // TODO: allow regalloc to replace a virtual register with a real one.
         visitor.read_write(self.as_mut());
+    }
+
+    /// Allow the register allocator to modify this register in place.
+    pub fn as_mut(&mut self) -> &mut u32 {
+        &mut self.0
+    }
+
+    /// Allow external users to inspect this register.
+    pub fn as_u32(&self) -> u32 {
+        self.0
     }
 }
 
