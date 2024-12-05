@@ -9,9 +9,9 @@ mod rex;
 mod sink;
 
 pub use alloc::RegallocVisitor;
-pub use imm::{Extension, Imm16, Imm32, Imm8};
-pub use mem::GprMem;
-pub use reg::{Gpr, Size};
+pub use imm::{Extension, Imm16, Imm32, Imm8, Simm32};
+pub use mem::{Amode, GprMem, Scale};
+pub use reg::{Gpr, Gpr2MinusRsp, Size};
 pub use rex::RexFlags;
 pub use sink::{CodeSink, KnownOffsetTable, Label, TrapCode};
 
