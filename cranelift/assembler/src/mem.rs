@@ -2,10 +2,11 @@
 
 use crate::alloc::RegallocVisitor;
 use crate::imm::{Simm32, Simm32PlusKnownOffset};
-use crate::reg::{self, Gpr, Gpr2MinusRsp, Size};
+use crate::reg::{self, Gpr, Gpr2MinusRsp, Size, Xmm};
 use crate::rex::{encode_modrm, encode_sib, Imm, RexFlags};
 use crate::sink::{CodeSink, KnownOffsetTable, Label, TrapCode};
 use arbitrary::Arbitrary;
+
 
 #[derive(Arbitrary, Clone, Debug)]
 pub enum Amode {
@@ -25,11 +26,12 @@ pub enum Amode {
         target: Label,
     },
 }
+
 impl Amode {
     pub fn trap_code(&self) -> Option<TrapCode> {
         match self {
-            Amode::ImmReg { trap, .. } | Amode::ImmRegRegShift { trap, .. } => *trap,
             Amode::RipRelative { .. } => None,
+            Amode::ImmReg { trap, .. } | Amode::ImmRegRegShift { trap, .. } => *trap,
         }
     }
 
@@ -160,6 +162,35 @@ impl GprMem {
         match self {
             GprMem::Gpr(gpr) => gpr.read_write(visitor),
             GprMem::Mem(amode) => amode.read(visitor),
+        }
+    }
+}
+
+#[derive(Arbitrary, Clone, Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub enum XmmMem {
+    Xmm(Xmm),
+    Mem(Amode),
+}
+impl XmmMem {
+    pub fn to_string(&self) -> String {
+        match self {
+            XmmMem::Xmm(xmm) => xmm.to_string().to_owned(),
+            XmmMem::Mem(amode) => amode.to_string(),
+        }
+    }
+
+    pub fn read(&mut self, visitor: &mut impl RegallocVisitor) {
+        match self {
+            XmmMem::Xmm(xmm) => xmm.read(visitor),
+            XmmMem::Mem(amode) => amode.read(visitor),
+        }
+    }
+
+    pub fn read_write(&mut self, visitor: &mut impl RegallocVisitor) {
+        match self {
+            XmmMem::Xmm(xmm) => xmm.read_write(visitor),
+            XmmMem::Mem(amode) => amode.read(visitor),
         }
     }
 }

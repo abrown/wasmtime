@@ -146,11 +146,14 @@ pub enum Location {
     r16,
     r32,
     r64,
+    
+    xmm,
 
     rm8,
     rm16,
     rm32,
     rm64,
+    rm128,
 }
 
 impl Location {
@@ -162,6 +165,7 @@ impl Location {
             ax | imm16 | r16 | rm16 => 16,
             eax | imm32 | r32 | rm32 => 32,
             rax | r64 | rm64 => 64,
+            xmm | rm128 => 128,
         }
     }
 
@@ -174,8 +178,8 @@ impl Location {
     pub fn uses_memory(&self) -> bool {
         use Location::*;
         match self {
-            al | ax | eax | rax | imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 => false,
-            rm8 | rm16 | rm32 | rm64 => true,
+            al | ax | eax | rax | imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | xmm => false,
+            rm8 | rm16 | rm32 | rm64 | rm128 => true,
         }
     }
 
@@ -186,7 +190,9 @@ impl Location {
             al | ax | eax | rax => OperandKind::FixedReg(*self),
             imm8 | imm16 | imm32 => OperandKind::Imm(*self),
             r8 | r16 | r32 | r64 => OperandKind::Reg(*self),
+            xmm => OperandKind::XmmReg(*self),
             rm8 | rm16 | rm32 | rm64 => OperandKind::RegMem(*self),
+            rm128 => OperandKind::XmmRegMem(*self),
         }
     }
 }
@@ -209,10 +215,13 @@ impl core::fmt::Display for Location {
             r32 => write!(f, "r32"),
             r64 => write!(f, "r64"),
 
+            xmm => write!(f, "xmm"),
+
             rm8 => write!(f, "rm8"),
             rm16 => write!(f, "rm16"),
             rm32 => write!(f, "rm32"),
             rm64 => write!(f, "rm64"),
+            rm128 => write!(f, "rm128"),
         }
     }
 }
@@ -223,6 +232,8 @@ pub enum OperandKind {
     Imm(Location),
     Reg(Location),
     RegMem(Location),
+    XmmReg(Location),
+    XmmRegMem(Location),
 }
 
 #[derive(Clone, Copy, Debug)]

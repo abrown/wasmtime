@@ -1,5 +1,5 @@
 use crate::dsl::{
-    fmt, inst, r, rex, rw, sxl, sxq, Features::*, Inst, LegacyPrefixes::*, Location::*,
+    fmt, inst, r, rex, rw, sxl, sxq, Features::*, Inst, LegacyPrefixes::*, Location::*
 };
 
 pub fn list() -> Vec<Inst> {
@@ -23,5 +23,6 @@ pub fn list() -> Vec<Inst> {
         inst("orw", fmt("RM", [rw(r16), r(rm16)]), rex(0x0B).prefix(_66).r(), None),
         inst("orl", fmt("RM", [rw(r32), r(rm32)]), rex(0x0B).r(), None),
         inst("orq", fmt("RM", [rw(r64), r(rm64)]), rex(0x0B).w().r(), None),
+        inst("orpd", fmt("A", [rw(xmm), r(rm128)]), rex(0x560F).prefix(_66).r(), None),
     ]
 }

@@ -3,7 +3,7 @@ use core::fmt;
 
 /// Abbreviated constructor for REX-encoded instructions.
 #[must_use]
-pub fn rex(opcode: u8) -> Rex {
+pub fn rex(opcode: u32) -> Rex {
     Rex {
         prefixes: LegacyPrefixes::NoPrefix,
         opcode,
@@ -47,7 +47,7 @@ pub struct Rex {
     /// Any legacy prefixes that should be included with the instruction.
     pub prefixes: LegacyPrefixes,
     /// The opcode of the instruction.
-    pub opcode: u8,
+    pub opcode: u32,
     /// Indicates setting the REX.W bit.
     ///
     /// From the specification: "Indicates the use of a REX prefix that affects
@@ -168,7 +168,7 @@ impl fmt::Display for Rex {
 pub enum LegacyPrefixes {
     /// No prefix bytes.
     NoPrefix,
-    /// Operand size override -- here, denoting "16-bit operation".
+    /// Operand size override -- here, denoting "16-bit operation" and "SSE".
     _66,
     /// The lock prefix.
     _F0,
