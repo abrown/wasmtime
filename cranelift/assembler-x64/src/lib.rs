@@ -5,7 +5,6 @@
 #![allow(non_camel_case_types)]
 
 mod api;
-pub mod fuzz;
 mod imm;
 pub mod isle;
 mod mem;

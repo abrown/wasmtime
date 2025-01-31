@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 arbitrary = { version = "1.3.2", features = ["derive"] }
-capstone = "0.12.0"
 
 [dev-dependencies]
 arbtest = "0.3.1"

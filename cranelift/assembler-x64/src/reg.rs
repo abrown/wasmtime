@@ -1,7 +1,7 @@
 //! Pure register operands; see [`Gpr`].
 
+use crate::rex::RexFlags;
 use crate::AsReg;
-use crate::{fuzz::FuzzReg, rex::RexFlags};
 use arbitrary::Arbitrary;
 
 /// A general purpose x64 register (e.g., `%rax`).
@@ -56,8 +56,7 @@ impl<R: AsReg> AsMut<R> for Gpr<R> {
 
 impl<'a, R: AsReg> Arbitrary<'a> for Gpr<R> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let reg = FuzzReg::arbitrary(u)?;
-        Ok(Self(R::new(reg.enc())))
+        Ok(Self(R::new(u.int_in_range(0..=15)?)))
     }
 }
 
