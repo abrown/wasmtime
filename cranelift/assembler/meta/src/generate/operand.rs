@@ -11,6 +11,8 @@ impl dsl::Location {
             imm16 => Some("Imm16"),
             imm32 => Some("Imm32"),
             r8 | r16 | r32 | r64 => Some("Gpr"),
+            rm128 => Some("XmmMem"),
+            xmm => Some("Xmm"),
             rm8 | rm16 | rm32 | rm64 => Some("GprMem"),
         }
     }
@@ -27,7 +29,9 @@ impl dsl::Location {
             imm8 | imm16 | imm32 => {
                 let variant = extension.generate_variant();
                 format!("self.{self}.to_string({variant})")
-            }
+            },
+            xmm => format!("self.{self}.to_string()"),
+            rm128 => format!("self.{self}.to_string()"),
             r8 | r16 | r32 | r64 | rm8 | rm16 | rm32 | rm64 => match self.generate_size() {
                 Some(size) => format!("self.{self}.to_string({size})"),
                 None => unreachable!(),
@@ -45,6 +49,7 @@ impl dsl::Location {
             r16 | rm16 => Some("Size::Word"),
             r32 | rm32 => Some("Size::Doubleword"),
             r64 | rm64 => Some("Size::Quadword"),
+            xmm | rm128 => Some("Size::DoubleQuadword"),
         }
     }
 
@@ -54,9 +59,10 @@ impl dsl::Location {
         use dsl::Location::*;
         match self {
             al | ax | eax | rax => Some("Gpr::new(reg::ENC_RAX.into())"),
-            imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | rm8 | rm16 | rm32 | rm64 => None,
+            imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | xmm | rm8 | rm16 | rm32 | rm64 | rm128 => None,
         }
     }
+
 }
 
 impl dsl::Mutability {

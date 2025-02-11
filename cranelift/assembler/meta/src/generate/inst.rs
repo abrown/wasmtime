@@ -84,7 +84,14 @@ impl dsl::Inst {
         if let Some(op) = self.format.uses_memory() {
             f.empty_line();
             f.comment("Emit trap.");
-            fmtln!(f, "if let GprMem::Mem({op}) = &self.{op} {{");
+            match op {
+                crate::dsl::Location::rm128 => {
+                    fmtln!(f, "if let XmmMem::Mem({op}) = &self.{op} {{");
+                }
+                _ => {
+                    fmtln!(f, "if let GprMem::Mem({op}) = &self.{op} {{");
+                }
+            }
             f.indent(|f| {
                 fmtln!(f, "if let Some(trap_code) = {op}.trap_code() {{");
                 f.indent(|f| {
@@ -128,6 +135,14 @@ impl dsl::Inst {
                     RegMem(rm) => {
                         let call = o.mutability.generate_regalloc_call();
                         fmtln!(f, "self.{rm}.{call}(visitor);");
+                    }
+                    XmmReg(xmm_reg) => {
+                        let call = o.mutability.generate_regalloc_call();
+                        fmtln!(f, "self.{xmm_reg}.{call}(visitor);");
+                    }
+                    XmmRegMem(xmm_mem) => {
+                        let call = o.mutability.generate_regalloc_call();
+                        fmtln!(f, "self.{xmm_mem}.{call}(visitor);");
                     }
                 }
             }
