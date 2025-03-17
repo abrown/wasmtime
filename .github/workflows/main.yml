@@ -405,7 +405,7 @@ jobs:
             checks: |
               -p cranelift-entity --no-default-features
               -p cranelift-entity --no-default-features --features enable-serde
-              
+
           - name: wasmtime-bench-api
             checks: |
               -p wasmtime-bench-api
@@ -813,7 +813,7 @@ jobs:
   test_wasi_nn:
     strategy:
       matrix:
-        feature: ["openvino"]
+        feature: ["openvino", "onnx"]
         os: ["ubuntu-latest", "windows-latest"]
         include:
           - os: windows-latest
