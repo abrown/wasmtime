@@ -2077,14 +2077,6 @@
             (_ Unit (emit (MInst.Mov64MR addr dst))))
         dst))
 
-;; Helper for emitting `MInst.AluRmiR` instructions.
-(decl alu_rmi_r (Type AluRmiROpcode Gpr GprMemImm) Gpr)
-(rule (alu_rmi_r ty opcode src1 src2)
-      (let ((dst WritableGpr (temp_writable_gpr))
-            (size OperandSize (operand_size_of_type_32_64 ty))
-            (_ Unit (emit (MInst.AluRmiR size opcode src1 src2 dst))))
-        dst))
-
 ;; Helper for emitting `MInst.AluRmRVex` instructions.
 (decl alu_rm_r_vex (Type AluRmROpcode Gpr GprMem) Gpr)
 (rule (alu_rm_r_vex ty opcode src1 src2)
