@@ -948,6 +948,24 @@ impl Context for IsleContext<'_, '_, MInst, X64Backend> {
         Box::new(amode.clone())
     }
 
+    fn x64_xor_zero(&mut self, ty: Type) -> Gpr {
+        use cranelift_assembler_x64::{inst, GprMem};
+
+        let wgpr = self.temp_writable_gpr();
+        let dst = self.convert_gpr_to_assembler_read_write_gpr(wgpr.to_reg());
+        let src = GprMem::Gpr(wgpr.to_reg());
+        let xor = match ty {
+            types::I8 => inst::xorb_rm::new(dst, src).into(),
+            types::I16 => inst::xorw_rm::new(dst, src).into(),
+            types::I32 => inst::xorl_rm::new(dst, src).into(),
+            types::I64 => inst::xorq_rm::new(dst, src).into(),
+            _ => unreachable!(),
+        };
+        let inst = MInst::ExternalZeroGpr { inst: xor };
+        self.emit(&inst);
+        wgpr.to_reg()
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     ///// External assembler methods.
     ////////////////////////////////////////////////////////////////////////////

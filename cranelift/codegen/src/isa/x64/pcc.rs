@@ -173,16 +173,6 @@ pub(crate) fn check(
             RegMem::Reg { .. } => undefined_result(ctx, vcode, dst, 64, size.to_bits().into()),
         },
 
-        Inst::AluConstOp {
-            op: AluRmiROpcode::Xor,
-            dst,
-            ..
-        } => check_output(ctx, vcode, dst.to_writable_reg(), &[], |_vcode| {
-            Ok(Some(Fact::constant(64, 0)))
-        }),
-
-        Inst::AluConstOp { dst, .. } => undefined_result(ctx, vcode, dst, 64, 64),
-
         Inst::UnaryRmR {
             size, ref src, dst, ..
         }
@@ -970,7 +960,8 @@ pub(crate) fn check(
 
         Inst::StackSwitchBasic { .. } => Err(PccError::UnimplementedInst),
 
-        Inst::External { .. } => Ok(()), // TODO: unsure what to do about this!
+        // TODO: it should be possible to read the operands of these instructions.
+        Inst::External { .. } | Inst::ExternalZeroGpr { .. } => Ok(()),
     }
 }
 

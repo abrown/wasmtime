@@ -29,10 +29,8 @@
                   (src2 GprMem)
                   (dst WritableGpr))
 
-       ;; Production of a zero value into a register of the specified size.
-       (AluConstOp (op AluRmiROpcode)
-                   (size OperandSize)
-                   (dst WritableGpr))
+       ;; Produce a zero value into a register of the specified size.
+       (ExternalZeroGpr (inst AssemblerInst))
 
        ;; Instructions on general-purpose registers that only read src and
        ;; defines dst (dst is not modified). `bsr`, etc.
@@ -3126,6 +3124,10 @@
 (rule 0 (x64_xor $I32 src1 (is_gpr_mem src2)) (x64_xorl_rm src1 src2))
 (rule 0 (x64_xor $I64 src1 (is_gpr_mem src2)) (x64_xorq_rm src1 src2))
 
+;; We also need a variant of `xor` with different regalloc semantics for zeroing
+;; out a GPR register.
+(decl x64_xor_zero (Type) Gpr)
+(extern constructor x64_xor_zero x64_xor_zero)
 
 
 (decl x64_andn (Type Gpr GprMem) Gpr)
@@ -3178,10 +3180,7 @@
 
 ;; Special case for integer zero immediates: turn them into an `xor r, r`.
 (rule 1 (imm (fits_in_64 ty) (u64_zero))
-      (let ((wgpr WritableGpr (temp_writable_gpr))
-            (size OperandSize (operand_size_of_type_32_64 ty))
-            (_ Unit (emit (MInst.AluConstOp (AluRmiROpcode.Xor) size wgpr))))
-        (gpr_to_reg wgpr)))
+      (x64_xor_zero ty))
 
 ;; Special case for zero immediates with vector types, they turn into an xor
 ;; specific to the vector type.

@@ -234,22 +234,6 @@ pub(crate) fn emit(
             }
         }
 
-        &Inst::AluConstOp { op, size, dst } => {
-            let dst = WritableGpr::from_writable_reg(dst.to_writable_reg()).unwrap();
-            emit(
-                &Inst::AluRmiR {
-                    size,
-                    op,
-                    dst,
-                    src1: dst.to_reg(),
-                    src2: dst.to_reg().into(),
-                },
-                sink,
-                info,
-                state,
-            );
-        }
-
         Inst::AluRmRVex {
             size,
             op,
@@ -4712,6 +4696,11 @@ pub(crate) fn emit(
             known_offsets[external::offsets::KEY_SLOT_OFFSET] =
                 i32::try_from(frame.outgoing_args_size).unwrap();
             inst.encode(sink, &known_offsets);
+        }
+
+        Inst::ExternalZeroGpr { inst, .. } => {
+            // TODO: no known offsets will be used--how to assert that?
+            inst.encode(sink, &[0, 0]);
         }
     }
 
