@@ -48,6 +48,7 @@ pub mod gpr;
 mod imm;
 pub mod inst;
 mod mem;
+mod op;
 mod rex;
 pub mod xmm;
 
@@ -87,4 +88,17 @@ pub use xmm::Xmm;
 /// List the files generated to create this assembler.
 pub fn generated_files() -> Vec<std::path::PathBuf> {
     include!(concat!(env!("OUT_DIR"), "/generated-files.rs"))
+}
+
+enum Op {
+    Imm,
+    Gpr,
+    Amode,
+}
+fn operands() -> impl ExactSizeIterator<Item = Op> {
+    [Op::Imm].into_iter()
+}
+fn us() {
+    let ops = operands();
+    assert_eq!(ops.len(), 1);
 }
