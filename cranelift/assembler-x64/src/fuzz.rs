@@ -4,7 +4,9 @@
 //! throughout this crate to avoid depending on the `arbitrary` crate
 //! unconditionally (use the `fuzz` feature instead).
 
-use crate::{AmodeOffset, AmodeOffsetPlusKnownOffset, AsReg, Gpr, Inst, NonRspGpr, Registers, Xmm};
+use crate::{
+    AmodeOffset, AmodeOffsetPlusKnownOffset, AsReg, Fixed, Gpr, Inst, NonRspGpr, Registers, Xmm,
+};
 use arbitrary::{Arbitrary, Result, Unstructured};
 use capstone::{arch::x86, arch::BuildsCapstone, arch::BuildsCapstoneSyntax, Capstone};
 
@@ -183,7 +185,7 @@ pub struct FuzzReg(u8);
 
 impl<'a> Arbitrary<'a> for FuzzReg {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self::new(u.int_in_range(0..=15)?))
+        Ok(Self(u.int_in_range(0..=15)?))
     }
 }
 
@@ -196,6 +198,13 @@ impl AsReg for FuzzReg {
     }
 }
 
+impl From<u8> for FuzzReg {
+    fn from(reg: u8) -> Self {
+        // assert!(reg < 16, "invalid register: {reg}");
+        Self(reg)
+    }
+}
+
 impl Arbitrary<'_> for AmodeOffsetPlusKnownOffset {
     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
         // For now, we don't generate offsets (TODO).
@@ -205,6 +214,32 @@ impl Arbitrary<'_> for AmodeOffsetPlusKnownOffset {
         })
     }
 }
+// impl<R: AsReg> Arbitrary<'_> for NonRspGpr<R> {
+//     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
+//         use crate::gpr::enc::*;
+//         let gpr = u.choose(&[
+//             RAX, RCX, RDX, RBX, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15,
+//         ])?;
+//         Ok(Self::new(R::new(*gpr)))
+//     }
+// }
+
+// impl Arbitrary<'_> for NonRspGpr<FuzzReg> {
+//     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
+//         use crate::gpr::enc::*;
+//         let gpr = u.choose(&[
+//             RAX, RCX, RDX, RBX, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15,
+//         ])?;
+//         Ok(Self::new(FuzzReg(*gpr)))
+//     }
+// }
+
+impl<R: AsReg, const E: u8> Arbitrary<'_> for Fixed<R, E> {
+    fn arbitrary(_: &mut Unstructured<'_>) -> Result<Self> {
+        Ok(Self::new(E))
+    }
+}
+
 impl<R: AsReg> Arbitrary<'_> for NonRspGpr<R> {
     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self> {
         use crate::gpr::enc::*;
@@ -214,14 +249,14 @@ impl<R: AsReg> Arbitrary<'_> for NonRspGpr<R> {
         Ok(Self::new(R::new(*gpr)))
     }
 }
-impl<'a, R: AsReg> Arbitrary<'a> for Gpr<R> {
+impl<'a, R: AsReg + Arbitrary<'a>> Arbitrary<'a> for Gpr<R> {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        Ok(Self(R::new(u.int_in_range(0..=15)?)))
+        Ok(Self(u.arbitrary()?))
     }
 }
-impl<'a, R: AsReg> Arbitrary<'a> for Xmm<R> {
+impl<'a, R: AsReg + Arbitrary<'a>> Arbitrary<'a> for Xmm<R> {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
-        Ok(Self(R::new(u.int_in_range(0..=15)?)))
+        Ok(Self(u.arbitrary()?))
     }
 }
 

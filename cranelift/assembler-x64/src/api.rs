@@ -124,7 +124,8 @@ pub trait AsReg: Clone + std::fmt::Debug {
     ///
     /// This is primarily useful for fuzzing, though it is also useful for
     /// generating fixed registers.
-    fn new(enc: u8) -> Self;
+    #[cfg(any(test, feature = "fuzz"))]
+    fn new(_: u8) -> Self;
 
     /// Return the register's hardware encoding; e.g., `0` for `%rax`.
     fn enc(&self) -> u8;
@@ -139,10 +140,16 @@ pub trait AsReg: Clone + std::fmt::Debug {
 }
 
 /// Provide a convenient implementation for testing.
+/// Create a register from its hardware encoding.
+///
+/// This is primarily useful for fuzzing, though it is also useful for
+/// generating fixed registers.
 impl AsReg for u8 {
+    #[cfg(any(test, feature = "fuzz"))]
     fn new(enc: u8) -> Self {
         enc
     }
+
     fn enc(&self) -> u8 {
         *self
     }

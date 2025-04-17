@@ -14,7 +14,8 @@ pub fn rust_assembler(f: &mut Formatter, insts: &[dsl::Inst]) {
     generate_inst_enum(f, insts);
     generate_inst_display_impl(f, insts);
     generate_inst_encode_impl(f, insts);
-    generate_inst_visit_impl(f, insts);
+    //generate_inst_visit_impl(f, insts);
+    // generate_inst_operands_impl(f, insts);
     generate_inst_features_impl(f, insts);
 
     // Generate per-instruction structs.
@@ -120,6 +121,20 @@ fn generate_inst_visit_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
         fmtln!(f, "}}");
     });
     fmtln!(f, "}}");
+}
+
+/// `impl Inst { fn operands... }`
+fn generate_inst_operands_impl(f: &mut Formatter, insts: &[dsl::Inst]) {
+    f.add_block("impl<R: Registers> Inst<R>", |f| {
+        f.add_block("pub fn operands<AR: AsReg>(&mut self) -> impl ExactSizeIterator<Item = Operand<AR>>", |f| {
+            f.add_block("match self", |f| {
+                for inst in insts {
+                    let variant_name = inst.name();
+                    fmtln!(f, "Self::{variant_name}(i) => i.operands(),");
+                }
+            });
+        })
+    });
 }
 
 /// `impl Inst { fn features... }`

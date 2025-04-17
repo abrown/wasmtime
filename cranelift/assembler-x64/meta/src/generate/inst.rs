@@ -18,16 +18,15 @@ impl dsl::Inst {
         }
         f.add_block(&format!("pub struct {struct_name} {where_clause}"), |f| {
             for k in &self.format.operands {
-                if let Some(ty) = k.generate_type() {
-                    let loc = k.location;
-                    fmtln!(f, "pub {loc}: {ty},");
-                }
+                let loc = k.location;
+                let ty = k.generate_type();
+                fmtln!(f, "pub {loc}: {ty},");
             }
         });
     }
 
     fn requires_generic(&self) -> bool {
-        self.format.uses_variable_register()
+        self.format.uses_register()
     }
 
     /// `<struct_name><R>`
@@ -57,8 +56,10 @@ impl dsl::Inst {
             self.generate_new_function(f);
             f.empty_line();
             self.generate_encode_function(f);
-            f.empty_line();
-            self.generate_visit_function(f);
+            // f.empty_line();
+            // self.generate_visit_function(f);
+            // f.empty_line();
+            // self.generate_operands_function(f);
             f.empty_line();
             self.generate_features_function(f);
         });
@@ -70,15 +71,9 @@ impl dsl::Inst {
             self.format
                 .operands
                 .iter()
-                .filter_map(|o| o.generate_type().map(|t| format!("{}: {}", o.location, t))),
+                .map(|o| format!("{}: {}", o.location, o.generate_type())),
         );
-        let args = comma_join(
-            self.format
-                .operands
-                .iter()
-                .filter(|o| !matches!(o.location.kind(), dsl::OperandKind::FixedReg(_)))
-                .map(|o| o.location.to_string()),
-        );
+        let args = comma_join(self.format.operands.iter().map(|o| o.location.to_string()));
 
         fmtln!(f, "#[must_use]");
         f.add_block(&format!("pub fn new({params}) -> Self"), |f| {
@@ -191,6 +186,38 @@ impl dsl::Inst {
         );
     }
 
+    /// `fn operands(&self, ...) { ... }`
+    fn generate_operands_function(&self, f: &mut Formatter) {
+        use dsl::Location::*;
+        use dsl::Mutability::*;
+
+        f.add_block(
+            &format!("pub fn operands<AR: AsReg>(&mut self) -> impl ExactSizeIterator<Item = Operand<AR>>"),
+            |f| {
+                let mut names = vec![];
+                for o in &self.format.operands {
+                    let variant = match o.mutability {
+                        Read => "Read",
+                        ReadWrite => "ReadWrite",
+                    };
+                    let loc = &o.location;
+
+                    let into = match loc {
+                        al | ax | eax | rax | cl => {
+                            let enc = loc.generate_fixed_reg().unwrap();
+                            format!("Gpr::new({enc}).into()")
+                        }
+                        imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | xmm | rm8 | rm16 | rm32 | rm64 | rm128 | m8
+                        | m16 | m32 | m64 => format!("self.{loc}.into()"),
+                    };
+                    fmtln!(f, "let {loc} = Operand::{variant}({into});");
+                    names.push(loc.to_string());
+                }
+                fmtln!(f, "[{}].into_iter()", comma_join(names.iter()));
+            },
+        );
+    }
+
     /// `fn features(&self) -> Vec<Flag> { ... }`
     fn generate_features_function(&self, f: &mut Formatter) {
         fmtln!(f, "#[must_use]");
@@ -240,6 +267,6 @@ impl dsl::Inst {
     }
 }
 
-fn comma_join<I: Into<String>>(items: impl Iterator<Item = I>) -> String {
+fn comma_join<S: Into<String>>(items: impl Iterator<Item = S>) -> String {
     items.map(Into::into).collect::<Vec<_>>().join(", ")
 }

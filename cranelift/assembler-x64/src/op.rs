@@ -1,13 +1,31 @@
-use crate::{Amode, AsReg, Gpr, GprMem, Imm16, Imm32, Imm8, Simm16, Simm32, Simm8, Xmm};
+use crate::{Amode, AsReg, Fixed, Gpr, GprMem, Imm16, Imm32, Imm8, Simm16, Simm32, Simm8, Xmm};
 
-pub enum OperandKind<R: AsReg> {
-    Readable(Operand<R>),
-    Writable(Operand<R>),
+/// An instruction operand.
+///
+/// This is useful for iterating over the operands of an [`Inst`][crate::Inst].
+///
+/// ```
+/// # use cranelift_assembler_x64::{Fixed, Imm8, inst, Inst, Registers};
+/// pub struct Regs;
+/// impl Registers for Regs {
+///     type ReadGpr = u8;
+///     type ReadWriteGpr = u8;
+///     type ReadXmm = u8;
+///     type ReadWriteXmm = u8;
+/// }
+///
+/// let rax = 0;
+/// let inst: Inst<Regs> = inst::addb_i::new(Fixed(rax), Imm8::new(0x42)).into();
+/// // let operands = inst.operands();
+/// ```
+pub enum Operand<R: AsReg> {
+    Read(OperandKind<R>),
+    ReadWrite(OperandKind<R>),
 }
 
 ///
-#[expect(missing_docs, reason = "self-describing variants")]
-pub enum Operand<R: AsReg> {
+// #[expect(missing_docs, reason = "self-describing variants")]
+pub enum OperandKind<R: AsReg> {
     // Memory operands.
     Amode(Amode<R>),
 
@@ -26,7 +44,7 @@ pub enum Operand<R: AsReg> {
     Simm32(Simm32),
 }
 
-impl<R: AsReg> From<GprMem<R, R>> for Operand<R> {
+impl<R: AsReg> From<GprMem<R, R>> for OperandKind<R> {
     fn from(gpr_mem: GprMem<R, R>) -> Self {
         match gpr_mem {
             GprMem::Gpr(gpr) => Gpr::new(gpr).into(),
@@ -35,68 +53,68 @@ impl<R: AsReg> From<GprMem<R, R>> for Operand<R> {
     }
 }
 
-impl<R: AsReg> From<Amode<R>> for Operand<R> {
+impl<R: AsReg> From<Amode<R>> for OperandKind<R> {
     fn from(amode: Amode<R>) -> Self {
-        Operand::Amode(amode)
+        OperandKind::Amode(amode)
     }
 }
 
-impl<R: AsReg> From<Gpr<R>> for Operand<R> {
+impl<R: AsReg> From<Gpr<R>> for OperandKind<R> {
     fn from(gpr: Gpr<R>) -> Self {
-        Operand::Gpr(gpr)
+        OperandKind::Gpr(gpr)
     }
 }
 
-// impl<R: AsReg> From<FixedGpr<R>> for Operand<R> {
-//     fn from(gpr: FixedGpr<R>) -> Self {
-//         Operand::FixedGpr(gpr)
-//     }
-// }
+impl<R: AsReg, const E: u8> From<Fixed<Gpr<R>, E>> for OperandKind<R> {
+    fn from(fixed: Fixed<Gpr<R>, E>) -> Self {
+        OperandKind::FixedGpr(fixed.0)
+    }
+}
 
-impl<R: AsReg> From<Xmm<R>> for Operand<R> {
+impl<R: AsReg> From<Xmm<R>> for OperandKind<R> {
     fn from(xmm: Xmm<R>) -> Self {
-        Operand::Xmm(xmm)
+        OperandKind::Xmm(xmm)
     }
 }
 
-// impl<R: AsReg> From<FixedXmm<R>> for Operand<R> {
-//     fn from(xmm: FixedXmm<R>) -> Self {
-//         Operand::FixedXmm(xmm)
-//     }
-// }
+impl<R: AsReg, const E: u8> From<Fixed<Xmm<R>, E>> for OperandKind<R> {
+    fn from(fixed: Fixed<Xmm<R>, E>) -> Self {
+        OperandKind::FixedXmm(fixed.0)
+    }
+}
 
-impl<R: AsReg> From<Imm8> for Operand<R> {
+impl<R: AsReg> From<Imm8> for OperandKind<R> {
     fn from(imm: Imm8) -> Self {
-        Operand::Imm8(imm)
+        OperandKind::Imm8(imm)
     }
 }
 
-impl<R: AsReg> From<Imm16> for Operand<R> {
+impl<R: AsReg> From<Imm16> for OperandKind<R> {
     fn from(imm: Imm16) -> Self {
-        Operand::Imm16(imm)
+        OperandKind::Imm16(imm)
     }
 }
 
-impl<R: AsReg> From<Imm32> for Operand<R> {
+impl<R: AsReg> From<Imm32> for OperandKind<R> {
     fn from(imm: Imm32) -> Self {
-        Operand::Imm32(imm)
+        OperandKind::Imm32(imm)
     }
 }
 
-impl<R: AsReg> From<Simm8> for Operand<R> {
+impl<R: AsReg> From<Simm8> for OperandKind<R> {
     fn from(imm: Simm8) -> Self {
-        Operand::Simm8(imm)
+        OperandKind::Simm8(imm)
     }
 }
 
-impl<R: AsReg> From<Simm16> for Operand<R> {
+impl<R: AsReg> From<Simm16> for OperandKind<R> {
     fn from(imm: Simm16) -> Self {
-        Operand::Simm16(imm)
+        OperandKind::Simm16(imm)
     }
 }
 
-impl<R: AsReg> From<Simm32> for Operand<R> {
+impl<R: AsReg> From<Simm32> for OperandKind<R> {
     fn from(imm: Simm32) -> Self {
-        Operand::Simm32(imm)
+        OperandKind::Simm32(imm)
     }
 }
