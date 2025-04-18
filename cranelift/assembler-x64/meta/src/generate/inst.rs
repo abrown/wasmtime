@@ -56,8 +56,6 @@ impl dsl::Inst {
             self.generate_new_function(f);
             f.empty_line();
             self.generate_encode_function(f);
-            // f.empty_line();
-            // self.generate_visit_function(f);
             f.empty_line();
             self.generate_operands_function(f);
             f.empty_line();
@@ -121,72 +119,7 @@ impl dsl::Inst {
         });
     }
 
-    /// `fn visit(&self, ...) { ... }`
-    fn generate_visit_function(&self, f: &mut Formatter) {
-        use dsl::OperandKind::*;
-        let extra_generic_bound = if self.requires_generic() { "" } else { "<R: Registers>" };
-        f.add_block(
-            &format!("pub fn visit{extra_generic_bound}(&mut self, visitor: &mut impl RegisterVisitor<R>)"),
-            |f| {
-                for o in &self.format.operands {
-                    match o.location.kind() {
-                        Imm(_) => {
-                            // Immediates do not need register allocation.
-                        }
-                        FixedReg(_) => {
-                            let call = o.mutability.generate_regalloc_call();
-                            let ty = o.mutability.generate_type();
-                            let Some(fixed) = o.location.generate_fixed_reg() else {
-                                unreachable!()
-                            };
-                            fmtln!(f, "visitor.fixed_{call}(&R::{ty}Gpr::new({fixed}));");
-                        }
-                        Reg(reg) => {
-                            match reg.bits() {
-                                128 => {
-                                    let call = o.mutability.generate_xmm_regalloc_call();
-                                    fmtln!(f, "visitor.{call}(self.{reg}.as_mut());");
-                                }
-                                _ => {
-                                    let call = o.mutability.generate_regalloc_call();
-                                    fmtln!(f, "visitor.{call}(self.{reg}.as_mut());");
-                                }
-                            };
-                        }
-                        RegMem(rm) => {
-                            match rm.bits() {
-                                128 => {
-                                    let call = o.mutability.generate_xmm_regalloc_call();
-                                    f.add_block(&format!("match &mut self.{rm}"), |f| {
-                                        fmtln!(f, "XmmMem::Xmm(r) => visitor.{call}(r),");
-                                        fmtln!(
-                                        f,
-                                        "XmmMem::Mem(m) => m.registers_mut().iter_mut().for_each(|r| visitor.read(r)),"
-                                    );
-                                    });
-                                }
-                                _ => {
-                                    let call = o.mutability.generate_regalloc_call();
-                                    f.add_block(&format!("match &mut self.{rm}"), |f| {
-                                        fmtln!(f, "GprMem::Gpr(r) => visitor.{call}(r),");
-                                        fmtln!(
-                                        f,
-                                        "GprMem::Mem(m) => m.registers_mut().iter_mut().for_each(|r| visitor.read(r)),"
-                                    );
-                                    });
-                                }
-                            };
-                        }
-                        Mem(m) => {
-                            fmtln!(f, "self.{m}.registers_mut().iter_mut().for_each(|r| visitor.read(r));");
-                        }
-                    }
-                }
-            },
-        );
-    }
-
-    /// `fn operands(&self, ...) { ... }`
+    /// `fn operands(&mut self, ...) { ... }`
     fn generate_operands_function(&self, f: &mut Formatter) {
         use dsl::Location::*;
         use dsl::Mutability::*;

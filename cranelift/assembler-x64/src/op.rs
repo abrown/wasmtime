@@ -1,6 +1,5 @@
 use crate::{
-    Amode, AsReg, Fixed, Gpr, GprMem, Imm16, Imm32, Imm8, Registers, Simm16, Simm32, Simm8, Xmm,
-    XmmMem,
+    Amode, Gpr, GprMem, Imm16, Imm32, Imm8, Registers, Simm16, Simm32, Simm8, Xmm, XmmMem,
 };
 
 /// An instruction operand.
@@ -8,7 +7,7 @@ use crate::{
 /// This is useful for iterating over the operands of an [`Inst`][crate::Inst].
 ///
 /// ```
-/// # use cranelift_assembler_x64::{Fixed, Imm8, inst, Inst, Registers};
+/// # use cranelift_assembler_x64::{Fixed, Imm8, inst, Inst, Operand, Registers};
 /// pub struct Regs;
 /// impl Registers for Regs {
 ///     type ReadGpr = u8;
@@ -18,17 +17,15 @@ use crate::{
 /// }
 ///
 /// let rax = 0;
-/// let inst: Inst<Regs> = inst::addb_i::new(Fixed(rax), Imm8::new(0x42)).into();
-/// // let operands = inst.operands();
+/// let mut inst: Inst<Regs> = inst::addb_i::new(Fixed(rax), Imm8::new(0x42)).into();
+/// let operands = inst.operands();
+/// assert_eq!(operands.len(), 2);
+/// assert!(matches!(operands[0], Operand::ReadWriteGpr { fixed: true, .. }));
+/// assert!(matches!(operands[1], Operand::Imm8(_)));
 /// ```
 
-// pub enum Operand<R: Registers> {
-//     Read(OperandKind<R>),
-//     ReadWrite(OperandKind<R>),
-// }
-
-///
-// #[expect(missing_docs, reason = "self-describing variants")]
+/// TODO
+#[derive(Debug)]
 pub enum Operand<'a, R: Registers> {
     // Memory operands.
     Amode(&'a mut Amode<R::ReadGpr>),
