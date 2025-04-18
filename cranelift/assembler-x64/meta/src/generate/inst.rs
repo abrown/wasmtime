@@ -58,8 +58,8 @@ impl dsl::Inst {
             self.generate_encode_function(f);
             // f.empty_line();
             // self.generate_visit_function(f);
-            // f.empty_line();
-            // self.generate_operands_function(f);
+            f.empty_line();
+            self.generate_operands_function(f);
             f.empty_line();
             self.generate_features_function(f);
         });
@@ -191,31 +191,47 @@ impl dsl::Inst {
         use dsl::Location::*;
         use dsl::Mutability::*;
 
-        f.add_block(
-            &format!("pub fn operands<AR: AsReg>(&mut self) -> impl ExactSizeIterator<Item = Operand<AR>>"),
-            |f| {
-                let mut names = vec![];
-                for o in &self.format.operands {
-                    let variant = match o.mutability {
-                        Read => "Read",
-                        ReadWrite => "ReadWrite",
-                    };
-                    let loc = &o.location;
+        f.add_block(&format!("pub fn operands<'a>(&'a mut self) -> Vec<Operand<'a, R>>"), |f| {
+            let mut names = vec![];
+            for o in &self.format.operands {
+                let mutability = match o.mutability {
+                    Read => "read",
+                    ReadWrite => "read_write",
+                };
+                let loc = &o.location;
 
-                    let into = match loc {
-                        al | ax | eax | rax | cl => {
-                            let enc = loc.generate_fixed_reg().unwrap();
-                            format!("Gpr::new({enc}).into()")
-                        }
-                        imm8 | imm16 | imm32 | r8 | r16 | r32 | r64 | xmm | rm8 | rm16 | rm32 | rm64 | rm128 | m8
-                        | m16 | m32 | m64 => format!("self.{loc}.into()"),
-                    };
-                    fmtln!(f, "let {loc} = Operand::{variant}({into});");
-                    names.push(loc.to_string());
-                }
-                fmtln!(f, "[{}].into_iter()", comma_join(names.iter()));
-            },
-        );
+                let constructor = match loc {
+                    al | ax | eax | rax | cl => {
+                        format!("from_{mutability}_fixed_gpr(&mut self.{loc}.0)")
+                    }
+                    r8 | r16 | r32 | r64 => {
+                        format!("from_{mutability}_gpr(&mut self.{loc})")
+                    }
+                    xmm => format!("from_{mutability}_xmm(&mut self.{loc})"),
+                    rm8 | rm16 | rm32 | rm64 => {
+                        format!("from_{mutability}_gpr_mem(&mut self.{loc})")
+                    }
+                    rm128 => {
+                        format!("from_{mutability}_xmm_mem(&mut self.{loc})")
+                    }
+                    m8 | m16 | m32 | m64 => {
+                        format!("from_amode(&mut self.{loc})")
+                    }
+                    imm8 | imm16 | imm32 => {
+                        let bits = loc.bits();
+                        let ty = if o.extension.is_sign_extended() {
+                            format!("Simm{bits}")
+                        } else {
+                            format!("Imm{bits}")
+                        };
+                        format!("{ty}(&mut self.{loc})")
+                    }
+                };
+                fmtln!(f, "let {loc} = Operand::{constructor};");
+                names.push(loc.to_string());
+            }
+            fmtln!(f, "vec![{}]", comma_join(names.iter()));
+        });
     }
 
     /// `fn features(&self) -> Vec<Flag> { ... }`

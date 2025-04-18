@@ -83,7 +83,7 @@ pub use imm::{Extension, Imm16, Imm32, Imm8, Simm16, Simm32, Simm8};
 pub use mem::{
     Amode, AmodeOffset, AmodeOffsetPlusKnownOffset, DeferredTarget, GprMem, Scale, XmmMem,
 };
-pub use op::{Operand, OperandKind};
+pub use op::Operand;
 pub use rex::RexFlags;
 pub use xmm::Xmm;
 
@@ -92,50 +92,57 @@ pub fn generated_files() -> Vec<std::path::PathBuf> {
     include!(concat!(env!("OUT_DIR"), "/generated-files.rs"))
 }
 
-enum Op<R: AsReg> {
-    Imm,
-    Gpr(R),
-    Fixed(u8),
-    Amode(R),
-}
-enum Inst2 {
-    Add,
-    Sub,
-    Mul,
-}
-impl Inst2 {
-    fn operands<AR: AsReg + 'static>(&self) -> Box<dyn ExactSizeIterator<Item = Op<AR>>> {
-        match self {
-            Inst2::Add => Box::new(add_operands::<AR>().into_iter()),
-            Inst2::Sub => Box::new(sub_operands::<AR>().into_iter()),
-            Inst2::Mul => Box::new(mul_operands::<AR>().into_iter()),
-        }
-    }
-}
-// type Iter = impl ExactSizeIterator<Item = Op<AR>>;
-// type Iter<AR> = std::array::IntoIter<Op<AR>, 2>;
-type Iter<AR, const N: usize> = [Op<AR>; N];
-fn add_operands<AR: AsReg>() -> Iter<AR, 2> {
-    [Op::Fixed(8), Op::Imm]
-}
-fn sub_operands<AR: AsReg>() -> Iter<AR, 0> {
-    // let x = AR::new(8);
-    // let y = AR::new(9);
-    // [Op::Amode(x), Op::Gpr(y)]
-    []
-}
-fn mul_operands<AR: AsReg>() -> Iter<AR, 0> {
-    []
-}
+// enum Op<R: AsReg, M: AsReg> {
+//     Imm,
+//     Gpr(R),
+//     Fixed(u8),
+//     Amode(M),
+// }
+// enum Inst2 {
+//     Add,
+//     Sub,
+//     Mul,
+// }
+// impl Inst2 {
+//     fn operands<AR: AsReg + 'static>(&self) -> Box<dyn ExactSizeIterator<Item = Op<AR>>> {
+//         match self {
+//             Inst2::Add => Box::new(add_operands::<AR>().into_iter()),
+//             Inst2::Sub => Box::new(sub_operands::<AR>().into_iter()),
+//             Inst2::Mul => Box::new(mul_operands::<AR>().into_iter()),
+//         }
+//     }
+//     fn operands_vec<AR: AsReg>(&self) -> Vec<Op<AR>> {
+//         match self {
+//             Inst2::Add => Box::new(add_operands::<AR>().into_iter()),
+//             Inst2::Sub => Box::new(sub_operands::<AR>().into_iter()),
+//             Inst2::Mul => Box::new(mul_operands::<AR>().into_iter()),
+//         }
+//     }
+// }
+// // type Iter = impl ExactSizeIterator<Item = Op<AR>>;
+// // type Iter<AR> = std::array::IntoIter<Op<AR>, 2>;
+// type Iter<AR, const N: usize> = [Op<AR>; N];
+// fn add_operands<AR: AsReg>() -> Iter<AR, 2> {
+//     [Op::Fixed(8), Op::Imm]
+// }
+// fn sub_operands<AR: AsReg>() -> Iter<AR, 0> {
+//     // let x = AR::new(8);
+//     // let y = AR::new(9);
+//     // [Op::Amode(x), Op::Gpr(y)]
+//     []
+// }
+// fn mul_operands<AR: AsReg>() -> Iter<AR, 0> {
+//     []
+// }
 
-#[test]
-fn us() {
-    assert_eq!(Inst2::Add.operands::<u8>().len(), 2);
-    // assert_eq!(Inst2::Sub.operands::<u8>().len(), 2);
-    assert_eq!(Inst2::Mul.operands::<u8>().len(), 0);
-}
+// #[test]
+// fn us() {
+//     assert_eq!(Inst2::Add.operands::<u8>().len(), 2);
+//     // assert_eq!(Inst2::Sub.operands::<u8>().len(), 2);
+//     assert_eq!(Inst2::Mul.operands::<u8>().len(), 0);
+// }
 
-struct addb<R: AsReg>(Fixed<R, { gpr::enc::RAX }>, Imm8);
+// struct addb<R: AsReg>(Fixed<R, { gpr::enc::RAX }>, Imm8);
 
 #[derive(Clone, Debug)]
 pub struct Fixed<R, const E: u8>(pub R);
