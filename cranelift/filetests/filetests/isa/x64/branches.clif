@@ -222,7 +222,7 @@ block2:
 ;   popq    %rbp
 ;   ret
 ; block2:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -241,7 +241,7 @@ block2:
 ;   popq %rbp
 ;   retq
 ; block3: ; offset 0x1d
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -270,7 +270,7 @@ block2:
 ;   popq    %rbp
 ;   ret
 ; block2:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -289,7 +289,7 @@ block2:
 ;   popq %rbp
 ;   retq
 ; block3: ; offset 0x1d
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -321,7 +321,7 @@ block2:
 ; block2:
 ;   jmp     label4
 ; block3:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -353,7 +353,7 @@ block2:
 ; block2: ; offset 0x30
 ;   jmp 0x3c
 ; block3: ; offset 0x35
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -383,7 +383,7 @@ block2:
 ;   testq   %rdi, %rdi
 ;   jl      label2; j label1
 ; block1:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -401,7 +401,7 @@ block2:
 ;   testq %rdi, %rdi
 ;   jl 0x14
 ; block2: ; offset 0xd
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -431,7 +431,7 @@ block2:
 ;   testl   %edi, %edi
 ;   jl      label2; j label1
 ; block1:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -449,7 +449,7 @@ block2:
 ;   testl %edi, %edi
 ;   jl 0x13
 ; block2: ; offset 0xc
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -479,7 +479,7 @@ block2:
 ;   testq   %rdi, %rdi
 ;   jz      label2; j label1
 ; block1:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -497,7 +497,7 @@ block2:
 ;   testq %rdi, %rdi
 ;   je 0x14
 ; block2: ; offset 0xd
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -527,7 +527,7 @@ block2:
 ;   testl   %edi, %edi
 ;   jz      label2; j label1
 ; block1:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -545,7 +545,7 @@ block2:
 ;   testl %edi, %edi
 ;   je 0x13
 ; block2: ; offset 0xc
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq
@@ -575,7 +575,7 @@ block2:
 ;   testq   %rdi, %rdi
 ;   jnle    label2; j label1
 ; block1:
-;   xorl    %eax, %eax, %eax
+;   xorb %al, %al
 ;   movq    %rbp, %rsp
 ;   popq    %rbp
 ;   ret
@@ -593,7 +593,7 @@ block2:
 ;   testq %rdi, %rdi
 ;   jg 0x14
 ; block2: ; offset 0xd
-;   xorl %eax, %eax
+;   xorb %al, %al
 ;   movq %rbp, %rsp
 ;   popq %rbp
 ;   retq

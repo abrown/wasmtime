@@ -181,7 +181,7 @@ block0(v0: i64, v1: i64):
 ;   movq    112(%rdi), %rdx
 ;   movq    %rdi, rsp(0 + virtual offset)
 ;   movq    %rdx, rsp(24 + virtual offset)
-;   xorq    %rdi, %rdi, %rdi
+;   xorq %rdi, %rdi
 ;   %rdi = stack_switch_basic %rsi, %rsi, %rdi
 ;   movq    rsp(128 + virtual offset), %rdx
 ;   movq    %rdi, rsp(16 + virtual offset)
@@ -451,7 +451,7 @@ block0(v0: i64, v1: i64):
 ;   movdqu  %xmm7, rsp(16 + virtual offset)
 ;   movsd   120(%rdi), %xmm7
 ;   movdqu  %xmm7, rsp(0 + virtual offset)
-;   xorq    %rdi, %rdi, %rdi
+;   xorq %rdi, %rdi
 ;   %rdi = stack_switch_basic %rsi, %rsi, %rdi
 ;   u64_to_f64_seq %rdi, %xmm0, %rax, %rcx
 ;   movdqu  rsp(240 + virtual offset), %xmm7

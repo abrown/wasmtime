@@ -40,7 +40,7 @@ block0:
 ;   movq    %r14, 24(%rsp)
 ;   movq    %r15, 32(%rsp)
 ; block0:
-;   xorl    %ebx, %ebx, %ebx
+;   xorl %ebx, %ebx
 ;   movl    $1, %r14d
 ;   movl    $2, %r15d
 ;   lea     rsp(0 + virtual offset), %r11
