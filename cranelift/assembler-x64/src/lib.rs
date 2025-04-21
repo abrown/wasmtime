@@ -157,3 +157,8 @@ impl<R: AsReg, const E: u8> AsReg for Fixed<R, E> {
         self.0.enc()
     }
 }
+impl<R, const E: u8> AsRef<R> for Fixed<R, E> {
+    fn as_ref(&self) -> &R {
+        &self.0
+    }
+}
