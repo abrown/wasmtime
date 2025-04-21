@@ -1,6 +1,7 @@
 //! This module defines x86_64-specific machine instruction types.
 
 pub use emit_state::EmitState;
+use regalloc2::PReg;
 
 use crate::binemit::{Addend, CodeOffset, Reloc};
 use crate::ir::{types, ExternalName, LibCall, TrapCode, Type};
@@ -2733,11 +2734,71 @@ fn x64_get_operands(inst: &mut Inst, collector: &mut impl OperandVisitor) {
         }
 
         Inst::External { inst } => {
-            inst.visit(&mut external::RegallocVisitor { collector });
+            use cranelift_assembler_x64::Amode::*;
+            use cranelift_assembler_x64::Operand::*;
+            use external::{PairedGpr, PairedXmm};
+
+            let tmp = Reg::from_real_reg(PReg::new(0, RegClass::Int));
+            for o in inst.operands() {
+                match o {
+                    ReadGpr { gpr, fixed: false } => collector.reg_use(gpr),
+                    ReadGpr { gpr, fixed: true } => collector.reg_fixed_use(gpr, tmp),
+                    ReadWriteGpr { gpr, fixed: false } => {
+                        let PairedGpr { read, write } = gpr;
+                        collector.reg_use(read);
+                        collector.reg_reuse_def(write, 0);
+                    }
+                    ReadWriteGpr { gpr, fixed: true } => {
+                        let PairedGpr { read, write } = gpr;
+                        collector.reg_fixed_use(read, tmp); // TODO
+                        collector.reg_fixed_def(write, tmp); // TODO
+                    }
+                    ReadXmm { xmm, fixed: false } => collector.reg_use(xmm),
+                    ReadXmm { xmm, fixed: true } => collector.reg_fixed_use(xmm, tmp),
+                    ReadWriteXmm { xmm, fixed: false } => {
+                        let PairedXmm { read, write } = xmm;
+                        collector.reg_use(read);
+                        collector.reg_reuse_def(write, 0);
+                    }
+                    ReadWriteXmm { xmm, fixed: true } => {
+                        let PairedXmm { read, write } = xmm;
+                        collector.reg_fixed_use(read, tmp); // TODO
+                        collector.reg_fixed_def(write, tmp); // TODO
+                    }
+                    Amode(amode) => match amode {
+                        ImmReg { base, .. } => collector.reg_use(base),
+                        ImmRegRegShift { base, index, .. } => {
+                            collector.reg_use(base);
+                            collector.reg_use(index.as_mut());
+                        }
+                        RipRelative { .. } => {
+                            // We do not record usage of the `%rip` register.
+                        }
+                    },
+                    Imm8(_) | Imm16(_) | Imm32(_) | Simm8(_) | Simm16(_) | Simm32(_) => {
+                        // No registers used.
+                    }
+                }
+            }
         }
         Inst::ExternalZeroGpr { inst, .. } => {
-            todo!()
-            // collector.reg_def(dst)
+            use cranelift_assembler_x64::Operand::*;
+
+            let mut ops = inst.operands();
+            match ops.as_mut_slice() {
+                [ReadWriteGpr { gpr: dst, .. }, ReadGpr { gpr: src, .. }] => {
+                    assert_eq!(dst.read, dst.write.to_reg());
+                    assert_eq!(**src, dst.write.to_reg());
+
+                    collector.reg_def(&mut dst.write);
+
+                    // Fix up the other registers to match the one register
+                    // allocation has changed.
+                    dst.read = dst.write.to_reg();
+                    **src = dst.write.to_reg();
+                }
+                _ => todo!(),
+            }
         }
     }
 }

@@ -48,10 +48,6 @@ impl asm::AsReg for PairedGpr {
             format!("(%{write:?} <- %{read:?})")
         }
     }
-
-    fn new(_: u8) -> Self {
-        panic!("disallow creation of new assembler registers")
-    }
 }
 
 /// A pair of XMM registers, one for reading and one for writing.
@@ -80,10 +76,6 @@ impl asm::AsReg for PairedXmm {
             format!("(%{write:?} <- %{read:?})")
         }
     }
-
-    fn new(_: u8) -> Self {
-        panic!("disallow creation of new assembler registers")
-    }
 }
 
 /// This bridges the gap between codegen and assembler for general purpose register types.
@@ -98,10 +90,6 @@ impl asm::AsReg for Gpr {
         } else {
             format!("%{:?}", self.to_reg())
         }
-    }
-
-    fn new(_: u8) -> Self {
-        panic!("disallow creation of new assembler registers")
     }
 }
 
@@ -118,10 +106,6 @@ impl asm::AsReg for Xmm {
         } else {
             format!("%{:?}", self.to_reg())
         }
-    }
-
-    fn new(_: u8) -> Self {
-        panic!("disallow creation of new assembler registers")
     }
 }
 
