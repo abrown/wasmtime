@@ -37,7 +37,7 @@ pub fn rust_param_raw(op: &Operand) -> String {
 /// converts `self.rust_param_raw()` to the assembler type.
 pub fn rust_convert_isle_to_assembler(op: &Operand) -> &'static str {
     match op.location.kind() {
-        OperandKind::Reg(r)  => match (r.bits(), op.mutability) {
+        OperandKind::Reg(r) => match (r.bits(), op.mutability) {
             (128, Mutability::Read) => "cranelift_assembler_x64::Xmm::new",
             (128, Mutability::ReadWrite) => "self.convert_xmm_to_assembler_read_write_xmm",
             (_, Mutability::Read) => "cranelift_assembler_x64::Gpr::new",
