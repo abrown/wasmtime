@@ -2043,12 +2043,6 @@ pub(crate) fn emit(
             let rex = RexFlags::clear_w();
 
             let (prefix, opcode, num_opcodes) = match op {
-                SseOpcode::Cvtdq2pd => (LegacyPrefixes::_F3, 0x0FE6, 2),
-                SseOpcode::Cvtpd2ps => (LegacyPrefixes::_66, 0x0F5A, 2),
-                SseOpcode::Cvtps2pd => (LegacyPrefixes::None, 0x0F5A, 2),
-                SseOpcode::Cvtdq2ps => (LegacyPrefixes::None, 0x0F5B, 2),
-                SseOpcode::Cvttpd2dq => (LegacyPrefixes::_66, 0x0FE6, 2),
-                SseOpcode::Cvttps2dq => (LegacyPrefixes::_F3, 0x0F5B, 2),
                 SseOpcode::Movaps => (LegacyPrefixes::None, 0x0F28, 2),
                 SseOpcode::Movapd => (LegacyPrefixes::_66, 0x0F28, 2),
                 SseOpcode::Movdqa => (LegacyPrefixes::_66, 0x0F6F, 2),
@@ -3245,8 +3239,6 @@ pub(crate) fn emit(
             let dst = dst.to_reg().to_reg();
 
             let (prefix, opcode, dst_first) = match op {
-                SseOpcode::Cvttss2si => (LegacyPrefixes::_F3, 0x0F2C, true),
-                SseOpcode::Cvttsd2si => (LegacyPrefixes::_F2, 0x0F2C, true),
                 // Movd and movq use the same opcode; the presence of the REX prefix (set below)
                 // actually determines which is used.
                 SseOpcode::Movd | SseOpcode::Movq => (LegacyPrefixes::_66, 0x0F7E, false),

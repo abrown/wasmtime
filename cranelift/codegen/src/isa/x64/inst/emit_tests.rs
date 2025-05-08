@@ -3491,23 +3491,6 @@ fn test_x64_emit() {
 
     // ========================================================
     // XMM_RM_R: Integer Conversion
-    insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvtdq2ps, RegMem::reg(xmm1), w_xmm8),
-        "440F5BC1",
-        "cvtdq2ps %xmm1, %xmm8",
-    ));
-
-    insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvttpd2dq, RegMem::reg(xmm15), w_xmm7),
-        "66410FE6FF",
-        "cvttpd2dq %xmm15, %xmm7",
-    ));
-
-    insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvttps2dq, RegMem::reg(xmm9), w_xmm8),
-        "F3450F5BC1",
-        "cvttps2dq %xmm9, %xmm8",
-    ));
 
     // XMM_Mov_R_M: float stores
     insns.push((
@@ -3668,12 +3651,6 @@ fn test_x64_emit() {
     ));
 
     insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvtdq2pd, RegMem::reg(xmm2), w_xmm8),
-        "F3440FE6C2",
-        "cvtdq2pd %xmm2, %xmm8",
-    ));
-
-    insns.push((
         Inst::xmm_unary_rm_r_evex(Avx512Opcode::Vpabsq, RegMem::reg(xmm2), w_xmm8),
         "6272FD081FC2",
         "vpabsq  %xmm2, %xmm8",
@@ -3691,18 +3668,6 @@ fn test_x64_emit() {
         "vpopcntb %xmm2, %xmm8",
     ));
 
-    insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvtpd2ps, RegMem::reg(xmm7), w_xmm7),
-        "660F5AFF",
-        "cvtpd2ps %xmm7, %xmm7",
-    ));
-
-    insns.push((
-        Inst::xmm_unary_rm_r(SseOpcode::Cvtps2pd, RegMem::reg(xmm11), w_xmm9),
-        "450F5ACB",
-        "cvtps2pd %xmm11, %xmm9",
-    ));
-
     // Xmm to int conversions, and conversely.
 
     insns.push((
@@ -3714,26 +3679,6 @@ fn test_x64_emit() {
         Inst::xmm_to_gpr(SseOpcode::Movq, xmm2, w_rdi, OperandSize::Size64),
         "66480F7ED7",
         "movq    %xmm2, %rdi",
-    ));
-    insns.push((
-        Inst::xmm_to_gpr(SseOpcode::Cvttss2si, xmm0, w_rsi, OperandSize::Size32),
-        "F30F2CF0",
-        "cvttss2si %xmm0, %esi",
-    ));
-    insns.push((
-        Inst::xmm_to_gpr(SseOpcode::Cvttss2si, xmm0, w_rdi, OperandSize::Size64),
-        "F3480F2CF8",
-        "cvttss2si %xmm0, %rdi",
-    ));
-    insns.push((
-        Inst::xmm_to_gpr(SseOpcode::Cvttsd2si, xmm0, w_rax, OperandSize::Size32),
-        "F20F2CC0",
-        "cvttsd2si %xmm0, %eax",
-    ));
-    insns.push((
-        Inst::xmm_to_gpr(SseOpcode::Cvttsd2si, xmm0, w_r15, OperandSize::Size64),
-        "F24C0F2CF8",
-        "cvttsd2si %xmm0, %r15",
     ));
 
     insns.push((
