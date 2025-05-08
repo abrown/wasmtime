@@ -962,19 +962,6 @@ pub enum SseOpcode {
     Minpd,
     Minss,
     Minsd,
-    Movaps,
-    Movapd,
-    Movd,
-    Movdqa,
-    Movdqu,
-    Movlhps,
-    Movmskps,
-    Movmskpd,
-    Movq,
-    Movss,
-    Movsd,
-    Movups,
-    Movupd,
     Mulps,
     Mulpd,
     Mulss,
@@ -1021,19 +1008,6 @@ pub enum SseOpcode {
     Pminub,
     Pminuw,
     Pminud,
-    Pmovmskb,
-    Pmovsxbd,
-    Pmovsxbw,
-    Pmovsxbq,
-    Pmovsxwd,
-    Pmovsxwq,
-    Pmovsxdq,
-    Pmovzxbd,
-    Pmovzxbw,
-    Pmovzxbq,
-    Pmovzxwd,
-    Pmovzxwq,
-    Pmovzxdq,
     Pmuldq,
     Pmulhw,
     Pmulhuw,
@@ -1098,11 +1072,6 @@ impl SseOpcode {
             | SseOpcode::Maxss
             | SseOpcode::Minps
             | SseOpcode::Minss
-            | SseOpcode::Movaps
-            | SseOpcode::Movlhps
-            | SseOpcode::Movmskps
-            | SseOpcode::Movss
-            | SseOpcode::Movups
             | SseOpcode::Mulps
             | SseOpcode::Mulss
             | SseOpcode::Rcpss
@@ -1123,14 +1092,6 @@ impl SseOpcode {
             | SseOpcode::Maxsd
             | SseOpcode::Minpd
             | SseOpcode::Minsd
-            | SseOpcode::Movapd
-            | SseOpcode::Movd
-            | SseOpcode::Movmskpd
-            | SseOpcode::Movq
-            | SseOpcode::Movsd
-            | SseOpcode::Movupd
-            | SseOpcode::Movdqa
-            | SseOpcode::Movdqu
             | SseOpcode::Mulpd
             | SseOpcode::Mulsd
             | SseOpcode::Packssdw
@@ -1153,7 +1114,6 @@ impl SseOpcode {
             | SseOpcode::Pmaxub
             | SseOpcode::Pminsw
             | SseOpcode::Pminub
-            | SseOpcode::Pmovmskb
             | SseOpcode::Pmulhw
             | SseOpcode::Pmulhuw
             | SseOpcode::Pmullw
@@ -1212,18 +1172,6 @@ impl SseOpcode {
             | SseOpcode::Pminsd
             | SseOpcode::Pminuw
             | SseOpcode::Pminud
-            | SseOpcode::Pmovsxbd
-            | SseOpcode::Pmovsxbw
-            | SseOpcode::Pmovsxbq
-            | SseOpcode::Pmovsxwd
-            | SseOpcode::Pmovsxwq
-            | SseOpcode::Pmovsxdq
-            | SseOpcode::Pmovzxbd
-            | SseOpcode::Pmovzxbw
-            | SseOpcode::Pmovzxbq
-            | SseOpcode::Pmovzxwd
-            | SseOpcode::Pmovzxwq
-            | SseOpcode::Pmovzxdq
             | SseOpcode::Pmuldq
             | SseOpcode::Pmulld
             | SseOpcode::Ptest
@@ -1290,19 +1238,6 @@ impl fmt::Debug for SseOpcode {
             SseOpcode::Minpd => "minpd",
             SseOpcode::Minss => "minss",
             SseOpcode::Minsd => "minsd",
-            SseOpcode::Movaps => "movaps",
-            SseOpcode::Movapd => "movapd",
-            SseOpcode::Movd => "movd",
-            SseOpcode::Movdqa => "movdqa",
-            SseOpcode::Movdqu => "movdqu",
-            SseOpcode::Movlhps => "movlhps",
-            SseOpcode::Movmskps => "movmskps",
-            SseOpcode::Movmskpd => "movmskpd",
-            SseOpcode::Movq => "movq",
-            SseOpcode::Movss => "movss",
-            SseOpcode::Movsd => "movsd",
-            SseOpcode::Movups => "movups",
-            SseOpcode::Movupd => "movupd",
             SseOpcode::Mulps => "mulps",
             SseOpcode::Mulpd => "mulpd",
             SseOpcode::Mulss => "mulss",
@@ -1349,19 +1284,6 @@ impl fmt::Debug for SseOpcode {
             SseOpcode::Pminub => "pminub",
             SseOpcode::Pminuw => "pminuw",
             SseOpcode::Pminud => "pminud",
-            SseOpcode::Pmovmskb => "pmovmskb",
-            SseOpcode::Pmovsxbd => "pmovsxbd",
-            SseOpcode::Pmovsxbw => "pmovsxbw",
-            SseOpcode::Pmovsxbq => "pmovsxbq",
-            SseOpcode::Pmovsxwd => "pmovsxwd",
-            SseOpcode::Pmovsxwq => "pmovsxwq",
-            SseOpcode::Pmovsxdq => "pmovsxdq",
-            SseOpcode::Pmovzxbd => "pmovzxbd",
-            SseOpcode::Pmovzxbw => "pmovzxbw",
-            SseOpcode::Pmovzxbq => "pmovzxbq",
-            SseOpcode::Pmovzxwd => "pmovzxwd",
-            SseOpcode::Pmovzxwq => "pmovzxwq",
-            SseOpcode::Pmovzxdq => "pmovzxdq",
             SseOpcode::Pmuldq => "pmuldq",
             SseOpcode::Pmulhw => "pmulhw",
             SseOpcode::Pmulhuw => "pmulhuw",

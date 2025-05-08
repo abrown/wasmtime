@@ -2043,29 +2043,9 @@ pub(crate) fn emit(
             let rex = RexFlags::clear_w();
 
             let (prefix, opcode, num_opcodes) = match op {
-                SseOpcode::Movaps => (LegacyPrefixes::None, 0x0F28, 2),
-                SseOpcode::Movapd => (LegacyPrefixes::_66, 0x0F28, 2),
-                SseOpcode::Movdqa => (LegacyPrefixes::_66, 0x0F6F, 2),
-                SseOpcode::Movdqu => (LegacyPrefixes::_F3, 0x0F6F, 2),
-                SseOpcode::Movsd => (LegacyPrefixes::_F2, 0x0F10, 2),
-                SseOpcode::Movss => (LegacyPrefixes::_F3, 0x0F10, 2),
-                SseOpcode::Movups => (LegacyPrefixes::None, 0x0F10, 2),
-                SseOpcode::Movupd => (LegacyPrefixes::_66, 0x0F10, 2),
                 SseOpcode::Pabsb => (LegacyPrefixes::_66, 0x0F381C, 3),
                 SseOpcode::Pabsw => (LegacyPrefixes::_66, 0x0F381D, 3),
                 SseOpcode::Pabsd => (LegacyPrefixes::_66, 0x0F381E, 3),
-                SseOpcode::Pmovsxbd => (LegacyPrefixes::_66, 0x0F3821, 3),
-                SseOpcode::Pmovsxbw => (LegacyPrefixes::_66, 0x0F3820, 3),
-                SseOpcode::Pmovsxbq => (LegacyPrefixes::_66, 0x0F3822, 3),
-                SseOpcode::Pmovsxwd => (LegacyPrefixes::_66, 0x0F3823, 3),
-                SseOpcode::Pmovsxwq => (LegacyPrefixes::_66, 0x0F3824, 3),
-                SseOpcode::Pmovsxdq => (LegacyPrefixes::_66, 0x0F3825, 3),
-                SseOpcode::Pmovzxbd => (LegacyPrefixes::_66, 0x0F3831, 3),
-                SseOpcode::Pmovzxbw => (LegacyPrefixes::_66, 0x0F3830, 3),
-                SseOpcode::Pmovzxbq => (LegacyPrefixes::_66, 0x0F3832, 3),
-                SseOpcode::Pmovzxwd => (LegacyPrefixes::_66, 0x0F3833, 3),
-                SseOpcode::Pmovzxwq => (LegacyPrefixes::_66, 0x0F3834, 3),
-                SseOpcode::Pmovzxdq => (LegacyPrefixes::_66, 0x0F3835, 3),
                 SseOpcode::Sqrtps => (LegacyPrefixes::None, 0x0F51, 2),
                 SseOpcode::Sqrtpd => (LegacyPrefixes::_66, 0x0F51, 2),
                 SseOpcode::Movddup => (LegacyPrefixes::_F2, 0x0F12, 2),
@@ -3190,24 +3170,6 @@ pub(crate) fn emit(
             // result regardless of its value.
         }
 
-        Inst::XmmMovRM { op, src, dst } => {
-            let src = src.to_reg();
-            let dst = dst.clone();
-
-            let (prefix, opcode) = match op {
-                SseOpcode::Movaps => (LegacyPrefixes::None, 0x0F29),
-                SseOpcode::Movapd => (LegacyPrefixes::_66, 0x0F29),
-                SseOpcode::Movdqu => (LegacyPrefixes::_F3, 0x0F7F),
-                SseOpcode::Movss => (LegacyPrefixes::_F3, 0x0F11),
-                SseOpcode::Movsd => (LegacyPrefixes::_F2, 0x0F11),
-                SseOpcode::Movups => (LegacyPrefixes::None, 0x0F11),
-                SseOpcode::Movupd => (LegacyPrefixes::_66, 0x0F11),
-                _ => unimplemented!("Opcode {:?} not implemented", op),
-            };
-            let dst = &dst.finalize(state.frame_layout(), sink);
-            emit_std_reg_mem(sink, prefix, opcode, 2, src, dst, RexFlags::clear_w(), 0);
-        }
-
         Inst::XmmMovRMImm { op, src, dst, imm } => {
             let src = src.to_reg();
             let dst = dst.clone();
@@ -3227,30 +3189,6 @@ pub(crate) fn emit(
             let dst = &dst.finalize(state.frame_layout(), sink);
             emit_std_reg_mem(sink, prefix, opcode, 3, src, dst, rex, 1);
             sink.put1(*imm);
-        }
-
-        Inst::XmmToGpr {
-            op,
-            src,
-            dst,
-            dst_size,
-        } => {
-            let src = src.to_reg();
-            let dst = dst.to_reg().to_reg();
-
-            let (prefix, opcode, dst_first) = match op {
-                // Movd and movq use the same opcode; the presence of the REX prefix (set below)
-                // actually determines which is used.
-                SseOpcode::Movd | SseOpcode::Movq => (LegacyPrefixes::_66, 0x0F7E, false),
-                SseOpcode::Movmskps => (LegacyPrefixes::None, 0x0F50, true),
-                SseOpcode::Movmskpd => (LegacyPrefixes::_66, 0x0F50, true),
-                SseOpcode::Pmovmskb => (LegacyPrefixes::_66, 0x0FD7, true),
-                _ => panic!("unexpected opcode {op:?}"),
-            };
-            let rex = RexFlags::from(*dst_size);
-            let (src, dst) = if dst_first { (dst, src) } else { (src, dst) };
-
-            emit_std_reg_reg(sink, prefix, opcode, 2, src, dst, rex);
         }
 
         Inst::XmmToGprImm { op, src, dst, imm } => {

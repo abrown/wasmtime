@@ -432,13 +432,6 @@
                     (dst SyntheticAmode)
                     (imm u8))
 
-       ;; XMM (scalar) unary op (from xmm to integer reg): movd, movq,
-       ;; cvtts{s,d}2si
-       (XmmToGpr (op SseOpcode)
-                 (src Xmm)
-                 (dst WritableGpr)
-                 (dst_size OperandSize))
-
        ;; XMM (scalar) unary op (from xmm to integer reg): pextr{w,b,d,q}
        (XmmToGprImm (op SseOpcode)
                     (src Xmm)
@@ -897,19 +890,6 @@
             Minpd
             Minss
             Minsd
-            Movaps
-            Movapd
-            Movd
-            Movdqa
-            Movdqu
-            Movlhps
-            Movmskps
-            Movmskpd
-            Movq
-            Movss
-            Movsd
-            Movups
-            Movupd
             Mulps
             Mulpd
             Mulss
@@ -956,19 +936,6 @@
             Pminub
             Pminuw
             Pminud
-            Pmovmskb
-            Pmovsxbd
-            Pmovsxbw
-            Pmovsxbq
-            Pmovsxwd
-            Pmovsxwq
-            Pmovsxdq
-            Pmovzxbd
-            Pmovzxbw
-            Pmovzxbq
-            Pmovzxwd
-            Pmovzxwq
-            Pmovzxdq
             Pmuldq
             Pmulhw
             Pmulhuw
@@ -2543,148 +2510,128 @@
         dst))
 
 (decl x64_movss_load (SyntheticAmode) Xmm)
-(rule (x64_movss_load from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Movss) from))
 (rule 1 (x64_movss_load from)
         (if-let true (use_avx))
         (xmm_unary_rm_r_vex (AvxOpcode.Vmovss) from))
+(rule 0 (x64_movss_load from) (x64_movss_ax from))
 
 (decl x64_movss_store (SyntheticAmode Xmm) SideEffectNoResult)
-(rule (x64_movss_store addr data)
-      (xmm_movrm (SseOpcode.Movss) addr data))
 (rule 1 (x64_movss_store addr data)
         (if-let true (use_avx))
         (xmm_movrm_vex (AvxOpcode.Vmovss) addr data))
+(rule 0 (x64_movss_store addr data) (x64_movss_c_mem addr data))
 
 (decl x64_movsd_load (SyntheticAmode) Xmm)
-(rule (x64_movsd_load from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Movsd) from))
 (rule 1 (x64_movsd_load from)
         (if-let true (use_avx))
         (xmm_unary_rm_r_vex (AvxOpcode.Vmovsd) from))
+(rule 0 (x64_movsd_load from) (x64_movsd_a from))
 
 (decl x64_movsd_store (SyntheticAmode Xmm) SideEffectNoResult)
-(rule (x64_movsd_store addr data)
-      (xmm_movrm (SseOpcode.Movsd) addr data))
 (rule 1 (x64_movsd_store addr data)
         (if-let true (use_avx))
         (xmm_movrm_vex (AvxOpcode.Vmovsd) addr data))
+(rule 0 (x64_movsd_store addr data) (x64_movsd_b_mem addr data))
 
 (decl x64_movups_load (SyntheticAmode) Xmm)
-(rule (x64_movups_load from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Movups) from))
 (rule 1 (x64_movups_load from)
         (if-let true (use_avx))
         (xmm_unary_rm_r_vex (AvxOpcode.Vmovups) from))
+(rule 0 (x64_movups_load from) (x64_movups_a from))
 
 (decl x64_movups_store (SyntheticAmode Xmm) SideEffectNoResult)
-(rule (x64_movups_store addr data)
-      (xmm_movrm (SseOpcode.Movups) addr data))
 (rule 1 (x64_movups_store addr data)
         (if-let true (use_avx))
         (xmm_movrm_vex (AvxOpcode.Vmovups) addr data))
+(rule 0 (x64_movups_store addr data) (x64_movups_b_mem addr data))
 
 (decl x64_movupd_load (SyntheticAmode) Xmm)
-(rule (x64_movupd_load from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Movupd) from))
 (rule 1 (x64_movupd_load from)
         (if-let true (use_avx))
         (xmm_unary_rm_r_vex (AvxOpcode.Vmovupd) from))
+(rule 0 (x64_movupd_load from) (x64_movupd_a from))
 
 (decl x64_movupd_store (SyntheticAmode Xmm) SideEffectNoResult)
-(rule (x64_movupd_store addr data)
-      (xmm_movrm (SseOpcode.Movupd) addr data))
 (rule 1 (x64_movupd_store addr data)
         (if-let true (use_avx))
         (xmm_movrm_vex (AvxOpcode.Vmovupd) addr data))
+(rule 0 (x64_movupd_store addr data) (x64_movupd_b_mem addr data))
 
 ;; Helper for creating `movd` instructions.
 (decl x64_movd_to_gpr (Xmm) Gpr)
-(rule (x64_movd_to_gpr from)
-      (xmm_to_gpr (SseOpcode.Movd) from (OperandSize.Size32)))
 (rule 1 (x64_movd_to_gpr from)
         (if-let true (use_avx))
         (xmm_to_gpr_vex (AvxOpcode.Vmovd) from (OperandSize.Size32)))
+(rule 0 (x64_movd_to_gpr from) (x64_movd_b from))
 
 ;; Helper for creating `movd` instructions.
 (decl x64_movd_to_xmm (GprMem) Xmm)
-(rule (x64_movd_to_xmm from)
-      (gpr_to_xmm (SseOpcode.Movd) from (OperandSize.Size32)))
 (rule 1 (x64_movd_to_xmm from)
         (if-let true (use_avx))
         (gpr_to_xmm_vex (AvxOpcode.Vmovd) from (OperandSize.Size32)))
+(rule 0 (x64_movd_to_xmm from) (x64_movd_a from))
 
 ;; Helper for creating `movq` instructions.
 (decl x64_movq_to_xmm (GprMem) Xmm)
-(rule (x64_movq_to_xmm src)
-      (gpr_to_xmm (SseOpcode.Movq) src (OperandSize.Size64)))
 (rule 1 (x64_movq_to_xmm from)
         (if-let true (use_avx))
         (gpr_to_xmm_vex (AvxOpcode.Vmovq) from (OperandSize.Size64)))
+(rule 0 (x64_movq_to_xmm from) (x64_movq_a from))
 
 ;; Helper for creating `movq` instructions.
 (decl x64_movq_to_gpr (Xmm) Gpr)
-(rule (x64_movq_to_gpr src)
-      (xmm_to_gpr (SseOpcode.Movq) src (OperandSize.Size64)))
 (rule 1 (x64_movq_to_gpr from)
         (if-let true (use_avx))
         (xmm_to_gpr_vex (AvxOpcode.Vmovq) from (OperandSize.Size64)))
+(rule 0 (x64_movq_to_gpr from) (x64_movq_b from))
 
 (decl x64_movdqu_load (XmmMem) Xmm)
-(rule (x64_movdqu_load from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Movdqu) from))
 (rule 1 (x64_movdqu_load from)
         (if-let true (use_avx))
         (xmm_unary_rm_r_vex (AvxOpcode.Vmovdqu) from))
+(rule 0 (x64_movdqu_load from) (x64_movdqu_a from))
 
 (decl x64_movdqu_store (SyntheticAmode Xmm) SideEffectNoResult)
-(rule (x64_movdqu_store addr data)
-      (xmm_movrm (SseOpcode.Movdqu) addr data))
 (rule 1 (x64_movdqu_store addr data)
         (if-let true (use_avx))
         (xmm_movrm_vex (AvxOpcode.Vmovdqu) addr data))
+(rule 0 (x64_movdqu_store addr data) (x64_movdqu_b_mem addr data))
 
 (decl x64_pmovsxbw (XmmMem) Xmm)
-(rule (x64_pmovsxbw from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovsxbw) from))
 (rule 1 (x64_pmovsxbw from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovsxbw) from))
+(rule 0 (x64_pmovsxbw from) (x64_pmovsxbw_a from))
 
 (decl x64_pmovzxbw (XmmMem) Xmm)
-(rule (x64_pmovzxbw from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovzxbw) from))
 (rule 1 (x64_pmovzxbw from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovzxbw) from))
+(rule 0 (x64_pmovzxbw from) (x64_pmovzxbw_a from))
 
 (decl x64_pmovsxwd (XmmMem) Xmm)
-(rule (x64_pmovsxwd from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovsxwd) from))
 (rule 1 (x64_pmovsxwd from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovsxwd) from))
+(rule 0 (x64_pmovsxwd from) (x64_pmovsxwd_a from))
 
 (decl x64_pmovzxwd (XmmMem) Xmm)
-(rule (x64_pmovzxwd from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovzxwd) from))
 (rule 1 (x64_pmovzxwd from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovzxwd) from))
+(rule 0 (x64_pmovzxwd from) (x64_pmovzxwd_a from))
 
 (decl x64_pmovsxdq (XmmMem) Xmm)
-(rule (x64_pmovsxdq from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovsxdq) from))
 (rule 1 (x64_pmovsxdq from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovsxdq) from))
+(rule 0 (x64_pmovsxdq from) (x64_pmovsxdq_a from))
 
 (decl x64_pmovzxdq (XmmMem) Xmm)
-(rule (x64_pmovzxdq from)
-      (xmm_unary_rm_r_unaligned (SseOpcode.Pmovzxdq) from))
 (rule 1 (x64_pmovzxdq from)
       (if-let true (use_avx))
       (xmm_unary_rm_r_vex (AvxOpcode.Vpmovzxdq) from))
+(rule 0 (x64_pmovzxdq from) (x64_pmovzxdq_a from))
 
 (decl x64_movrm (Type SyntheticAmode Gpr) SideEffectNoResult)
 (spec (x64_movrm ty addr data)
@@ -4530,27 +4477,24 @@
 
 ;; Helper for creating `pmovmskb` instructions.
 (decl x64_pmovmskb (OperandSize Xmm) Gpr)
-(rule (x64_pmovmskb size src)
-      (xmm_to_gpr (SseOpcode.Pmovmskb) src size))
 (rule 1 (x64_pmovmskb size src)
         (if-let true (use_avx))
         (xmm_to_gpr_vex (AvxOpcode.Vpmovmskb) src size))
+(rule 0 (x64_pmvmskb size src) (x64_pmovmskb_rm src)) ;; TODO: remove size?
 
 ;; Helper for creating `movmskps` instructions.
 (decl x64_movmskps (OperandSize Xmm) Gpr)
-(rule (x64_movmskps size src)
-      (xmm_to_gpr (SseOpcode.Movmskps) src size))
 (rule 1 (x64_movmskps size src)
         (if-let true (use_avx))
         (xmm_to_gpr_vex (AvxOpcode.Vmovmskps) src size))
+(rule 0 (x64_movmskps size src) (x64_movmskps_rm src)) ;; TODO: remove size?
 
 ;; Helper for creating `movmskpd` instructions.
 (decl x64_movmskpd (OperandSize Xmm) Gpr)
-(rule (x64_movmskpd size src)
-      (xmm_to_gpr (SseOpcode.Movmskpd) src size))
 (rule 1 (x64_movmskpd size src)
         (if-let true (use_avx))
         (xmm_to_gpr_vex (AvxOpcode.Vmovmskpd) src size))
+(rule 0 (x64_movmskpd size src) (x64_movmskpd_rm src)) ;; TODO: remove size?
 
 ;; Helper for creating `not` instructions.
 (decl x64_not (Type Gpr) Gpr)
