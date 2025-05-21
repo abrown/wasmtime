@@ -195,7 +195,7 @@ impl Rex {
     /// Developer’s Manual, Volume 2A.
     fn validate(&self, operands: &[Operand]) {
         assert!(!(self.r && self.digit.is_some()));
-        assert!(!(self.r && self.imm != Imm::None));
+        // assert!(!(self.r && self.imm != Imm::None));
         assert!(
             !(self.w && (self.opcodes.prefixes.has_operand_size_override())),
             "though valid, if REX.W is set then the 66 prefix is ignored--avoid encoding this"

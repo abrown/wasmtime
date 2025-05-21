@@ -3992,12 +3992,7 @@
 (rule (x64_cmpp $F64X2 x y imm) (x64_cmppd x y imm))
 
 (decl x64_cmpps (Xmm XmmMem FcmpImm) Xmm)
-(rule 0 (x64_cmpps src1 src2 imm)
-      (xmm_rm_r_imm (SseOpcode.Cmpps)
-                    src1
-                    src2
-                    (encode_fcmp_imm imm)
-                    (OperandSize.Size32)))
+(rule 0 (x64_cmpps src1 src2 imm) (x64_cmpps_a src1 src2 (encode_fcmp_imm imm)))
 (rule 1 (x64_cmpps src1 src2 imm)
       (if-let true (use_avx))
       (xmm_rmr_imm_vex (AvxOpcode.Vcmpps)
@@ -4009,12 +4004,7 @@
 ;; operations, since this presumably induces the correct encoding of the
 ;; instruction.
 (decl x64_cmppd (Xmm XmmMem FcmpImm) Xmm)
-(rule 0 (x64_cmppd src1 src2 imm)
-      (xmm_rm_r_imm (SseOpcode.Cmppd)
-                    src1
-                    src2
-                    (encode_fcmp_imm imm)
-                    (OperandSize.Size32)))
+(rule 0 (x64_cmppd src1 src2 imm) (x64_cmppd_a src1 src2 (encode_fcmp_imm imm)))
 (rule 1 (x64_cmppd src1 src2 imm)
       (if-let true (use_avx))
       (xmm_rmr_imm_vex (AvxOpcode.Vcmppd)
