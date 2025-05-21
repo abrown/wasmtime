@@ -46,6 +46,7 @@ impl dsl::Format {
         self.generate_opcodes(f, rex);
         self.generate_modrm_byte(f, rex);
         self.generate_immediate(f);
+        self.generate_eflags_usage(f);
     }
 
     /// `buf.put1(...);`
@@ -204,6 +205,31 @@ impl dsl::Format {
             unknown => {
                 // Do nothing: no immediates expected.
                 assert!(!unknown.iter().any(|o| matches!(o, Imm(_))));
+            }
+        }
+    }
+
+    pub fn generate_eflags_usage(&self, f: &mut Formatter) {
+        if self.eflags != dsl::EflagsMutability::None {
+            f.empty_line();
+            f.comment("Handle EFLAGS register effects.");
+            match self.eflags {
+                dsl::EflagsMutability::R => {
+                    fmtln!(f, "// This instruction reads the EFLAGS register");
+                    // Add code to handle instructions that read flags
+                }
+                dsl::EflagsMutability::W => {
+                    fmtln!(f, "// This instruction modifies the EFLAGS register");
+                    // Add code to handle instructions that write flags
+                }
+                dsl::EflagsMutability::RW => {
+                    fmtln!(
+                        f,
+                        "// This instruction both reads and modifies the EFLAGS register"
+                    );
+                    // Add code to handle instructions that both read and write flags
+                }
+                dsl::EflagsMutability::None => {} // No flags usage
             }
         }
     }

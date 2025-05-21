@@ -142,7 +142,7 @@ pub fn generate_macro_inst_fn(f: &mut Formatter, inst: &Inst) {
                 (ty, var)
             };
             match results.as_slice() {
-                [] => fmtln!(f, "SideEffectNoResult::Inst(inst)"),
+                [] => fmtln!(f, "AssemblerOutputs::SideEffect {{ inst }}"),
                 [op] => match op.location.kind() {
                     OperandKind::Imm(_) => unreachable!(),
                     OperandKind::Reg(r) | OperandKind::FixedReg(r) => {
@@ -237,6 +237,9 @@ pub fn isle_param_raw(op: &Operand) -> String {
 /// for memory and one for in registers.
 #[derive(Copy, Clone, Debug)]
 pub enum IsleConstructor {
+    /// TODO
+    NoReturnSideEffect,
+
     /// This constructor only produces a side effect, meaning that the
     /// instruction does not produce results in registers. This may produce
     /// a result in memory, however.
@@ -258,7 +261,9 @@ impl IsleConstructor {
     /// Returns the result type, in ISLE, that this constructor generates.
     pub fn result_ty(&self) -> &'static str {
         match self {
-            IsleConstructor::RetMemorySideEffect => "SideEffectNoResult",
+            IsleConstructor::NoReturnSideEffect | IsleConstructor::RetMemorySideEffect => {
+                "SideEffectNoResult"
+            }
             IsleConstructor::RetGpr => "Gpr",
             IsleConstructor::RetXmm => "Xmm",
             IsleConstructor::RetValueRegs => "ValueRegs",
@@ -269,7 +274,9 @@ impl IsleConstructor {
     /// type returned by [`Self::result_ty`].
     pub fn conversion_constructor(&self) -> &'static str {
         match self {
-            IsleConstructor::RetMemorySideEffect => "defer_side_effect",
+            IsleConstructor::NoReturnSideEffect | IsleConstructor::RetMemorySideEffect => {
+                "defer_side_effect"
+            }
             IsleConstructor::RetGpr => "emit_ret_gpr",
             IsleConstructor::RetXmm => "emit_ret_xmm",
             IsleConstructor::RetValueRegs => "emit_ret_value_regs",
@@ -279,6 +286,7 @@ impl IsleConstructor {
     /// Returns the suffix used in the ISLE constructor name.
     pub fn suffix(&self) -> &'static str {
         match self {
+            IsleConstructor::NoReturnSideEffect => "",
             IsleConstructor::RetMemorySideEffect => "_mem",
             IsleConstructor::RetGpr | IsleConstructor::RetXmm | IsleConstructor::RetValueRegs => "",
         }
@@ -294,6 +302,7 @@ pub fn isle_param_for_ctor(op: &Operand, ctor: IsleConstructor) -> String {
         // other constructor it's operating on registers so the argument is
         // a `Gpr`.
         OperandKind::RegMem(_) if op.mutability.is_write() => match ctor {
+            IsleConstructor::NoReturnSideEffect => "".to_string(), // TODO
             IsleConstructor::RetMemorySideEffect => "Amode".to_string(),
             IsleConstructor::RetGpr => "Gpr".to_string(),
             IsleConstructor::RetXmm => "Xmm".to_string(),
@@ -320,9 +329,7 @@ pub fn isle_constructors(format: &Format) -> Vec<IsleConstructor> {
         .filter(|o| o.mutability.is_write())
         .collect::<Vec<_>>();
     match &write_operands[..] {
-        [] => unimplemented!(
-            "if you truly need this (and not a `SideEffect*`), add a `NoReturn` variant to `AssemblerOutputs`"
-        ),
+        [] => vec![IsleConstructor::NoReturnSideEffect],
         [one] => match one.mutability {
             Read => unreachable!(),
             ReadWrite | Write => match one.location.kind() {

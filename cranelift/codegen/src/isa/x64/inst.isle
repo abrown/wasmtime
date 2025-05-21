@@ -2636,6 +2636,8 @@
 (decl asm_produce_flags_side_effect (AssemblerOutputs) ProducesFlags)
 (rule (asm_produce_flags_side_effect (AssemblerOutputs.RetGpr inst gpr))
       (ProducesFlags.ProducesFlagsSideEffect inst))
+(rule (asm_produce_flags_side_effect (AssemblerOutputs.SideEffect inst))
+      (ProducesFlags.ProducesFlagsSideEffect inst))
 
 ;; Other helpers for instruction emission.
 
@@ -3169,9 +3171,11 @@
 ;; Helper for creating floating-point comparison instructions (`UCOMIS[S|D]`).
 (decl x64_ucomis (Type Xmm XmmMem) ProducesFlags)
 (rule (x64_ucomis $F32 src1 src2)
-      (xmm_cmp_rm_r (SseOpcode.Ucomiss) src1 src2))
+      (asm_produce_flags_side_effect (x64_ucomiss_a_raw src1 src2)))
+      ;; (xmm_cmp_rm_r (SseOpcode.Ucomiss) src1 src2))
 (rule (x64_ucomis $F64 src1 src2)
-      (xmm_cmp_rm_r (SseOpcode.Ucomisd) src1 src2))
+      (asm_produce_flags_side_effect (x64_ucomisd_a_raw src1 src2)))
+      ;; (xmm_cmp_rm_r (SseOpcode.Ucomisd) src1 src2))
 (rule 1 (x64_ucomis $F32 src1 src2)
         (if-let true (use_avx))
         (xmm_cmp_rm_r_vex (AvxOpcode.Vucomiss) src1 src2))
