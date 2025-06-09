@@ -1,5 +1,5 @@
 use crate::dsl::{Feature::*, Inst, Location::*, VexLength::*};
-use crate::dsl::{fmt, inst, r, rex, rw, vex, w};
+use crate::dsl::{fmt, inst, partial, r, rex, vex, w};
 
 #[rustfmt::skip] // Keeps instructions on a single line.
 pub fn list() -> Vec<Inst> {
@@ -17,10 +17,10 @@ pub fn list() -> Vec<Inst> {
         inst("pextrd", fmt("A", [w(rm32), r(xmm2), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x16]).r().ib(), _64b | compat | sse41),
         inst("pextrq", fmt("A", [w(rm64), r(xmm2), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x16]).w().r().ib(), _64b | sse41),
 
-        inst("pinsrb", fmt("A", [rw(xmm1), r(r32m8), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x20]).r().ib(), _64b | compat | sse41),
-        inst("pinsrw", fmt("A", [rw(xmm1), r(r32m16), r(imm8)]), rex([0x66, 0x0F, 0xC4]).r().ib(), _64b | compat | sse2),
-        inst("pinsrd", fmt("A", [rw(xmm1), r(rm32), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x22]).r().ib(), _64b | compat | sse41),
-        inst("pinsrq", fmt("A", [rw(xmm1), r(rm64), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x22]).r().ib().w(), _64b | sse41),
+        inst("pinsrb", fmt("A", [w(partial(xmm1)), r(r32m8), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x20]).r().ib(), _64b | compat | sse41),
+        inst("pinsrw", fmt("A", [w(partial(xmm1)), r(r32m16), r(imm8)]), rex([0x66, 0x0F, 0xC4]).r().ib(), _64b | compat | sse2),
+        inst("pinsrd", fmt("A", [w(partial(xmm1)), r(rm32), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x22]).r().ib(), _64b | compat | sse41),
+        inst("pinsrq", fmt("A", [w(partial(xmm1)), r(rm64), r(imm8)]), rex([0x66, 0x0F, 0x3A, 0x22]).r().ib().w(), _64b | sse41),
 
         inst("movmskps", fmt("RM", [w(r32), r(xmm2)]), rex([0x0F, 0x50]).r(), _64b | compat | sse),
         inst("movmskpd", fmt("RM", [w(r32), r(xmm2)]), rex([0x66, 0x0F, 0x50]).r(), _64b | compat | sse2),

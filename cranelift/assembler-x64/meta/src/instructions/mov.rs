@@ -1,5 +1,5 @@
 use crate::dsl::{Feature::*, Inst, Location::*, VexLength::*};
-use crate::dsl::{align, fmt, inst, r, rex, rw, sxl, sxq, sxw, vex, w};
+use crate::dsl::{align, fmt, inst, low32, low64, r, rex, sxl, sxq, sxw, vex, w};
 
 #[rustfmt::skip] // Keeps instructions on a single line.
 pub fn list() -> Vec<Inst> {
@@ -78,10 +78,10 @@ pub fn list() -> Vec<Inst> {
         // byte. Currently our encoding based on format doesn't account for this
         // special case, so it's just dropped here.
         inst("movss", fmt("A_M", [w(xmm1), r(m32)]), rex([0xF3, 0x0F, 0x10]).r(), _64b | sse),
-        inst("movss", fmt("A_R", [rw(xmm1), r(xmm2)]), rex([0xF3, 0x0F, 0x10]).r(), _64b | sse),
+        inst("movss", fmt("A_R", [w(low32(xmm1)), r(xmm2)]), rex([0xF3, 0x0F, 0x10]).r(), _64b | sse),
         inst("movss", fmt("C_M", [w(m64), r(xmm1)]), rex([0xF3, 0x0F, 0x11]).r(), _64b | sse),
         inst("movsd", fmt("A_M", [w(xmm1), r(m32)]), rex([0xF2, 0x0F, 0x10]).r(), _64b | sse2),
-        inst("movsd", fmt("A_R", [rw(xmm1), r(xmm2)]), rex([0xF2, 0x0F, 0x10]).r(), _64b | sse2),
+        inst("movsd", fmt("A_R", [w(low64(xmm1)), r(xmm2)]), rex([0xF2, 0x0F, 0x10]).r(), _64b | sse2),
         inst("movsd", fmt("C_M", [w(m64), r(xmm1)]), rex([0xF2, 0x0F, 0x11]).r(), _64b | sse2),
 
         // Move aligned 128-bit values to and from XMM locations.
