@@ -17,7 +17,7 @@ pub use encoding::{
 pub use encoding::{Vex, VexEscape, VexLength, VexPrefix, vex};
 pub use features::{ALL_FEATURES, Feature, Features};
 pub use format::{Extension, Format, Location, Mutability, Operand, OperandKind, RegClass};
-pub use format::{align, fmt, implicit, r, rw, sxl, sxq, sxw, w};
+pub use format::{align, fmt, implicit, low32, low64, partial, r, rw, sxl, sxq, sxw, w};
 
 /// Abbreviated constructor for an x64 instruction.
 pub fn inst(
@@ -26,16 +26,16 @@ pub fn inst(
     encoding: impl Into<Encoding>,
     features: impl Into<Features>,
 ) -> Inst {
-    let encoding = encoding.into();
-    encoding.validate(&format.operands);
-    Inst {
+    let inst = Inst {
         mnemonic: mnemonic.into(),
         format,
-        encoding,
+        encoding: encoding.into(),
         features: features.into(),
         has_trap: false,
         custom: Custom::default(),
-    }
+    };
+    inst.validate();
+    inst
 }
 
 /// An x64 instruction.
@@ -100,6 +100,43 @@ impl Inst {
     pub fn custom(mut self, custom: impl Into<Custom>) -> Self {
         self.custom = custom.into();
         self
+    }
+
+    /// Check the instruction to ensure we have defined a valid one; we try
+    /// where possible to make it impossible to define an invalid
+    /// instruction--by construction--but some information is only available
+    /// after all the pieces are put together.
+    fn validate(&self) {
+        // General operand validation.
+        for o in &self.format.operands {
+            if o.partial.is_some() {
+                assert!(
+                    o.mutability == Mutability::Write,
+                    "any partial-write operand must be write-only: {self}"
+                );
+            }
+
+            if o.mutability == Mutability::Write
+                && o.location.uses_register()
+                && matches!(o.location.bits(), 8 | 16)
+            {
+                assert!(
+                    o.partial.is_some(),
+                    "all 8-bit and 16-bit writable operands must be partial: {self} (use `w` for this to be automatic)"
+                );
+            }
+
+            if let OperandKind::Imm(op) = o.location.kind() {
+                assert_eq!(
+                    op.bits(),
+                    self.encoding.imm().bits(),
+                    "for an immediate, the encoding width must match the declared operand width: {self}"
+                );
+            }
+        }
+
+        // Encoding-specific validation.
+        self.encoding.validate(&self.format.operands);
     }
 }
 

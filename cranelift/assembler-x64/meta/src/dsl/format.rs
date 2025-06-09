@@ -55,9 +55,56 @@ pub fn r(op: impl Into<Operand>) -> Operand {
 #[must_use]
 pub fn w(op: impl Into<Operand>) -> Operand {
     let op = op.into();
+
+    // Automatically record partial writes to 8- and 16-bit registers.
+    let partial = if op.location.uses_register() && matches!(op.location.bits(), 8 | 16) {
+        match op.location.bits() {
+            8 => Some(PartialBits::low_8bits()),
+            16 => Some(PartialBits::low_16bits()),
+            _ => unreachable!(),
+        }
+    } else {
+        op.partial
+    };
+
     Operand {
         mutability: Mutability::Write,
+        partial,
         ..op
+    }
+}
+
+/// An abbreviated constructor for an operand that partially writes some bits of
+/// a register. In this case, we do not know which bits; use [`low32`] or
+/// [`low64`] if the written-to bits _are_ known.
+#[must_use]
+pub fn partial(location: Location) -> Operand {
+    assert!(location.uses_register());
+    Operand {
+        partial: Some(PartialBits::Unknown),
+        ..Operand::from(location)
+    }
+}
+
+/// An abbreviated constructor for an operand that partially writes the
+/// low 32-bits of an XMM register.
+#[must_use]
+pub fn low32(location: Location) -> Operand {
+    assert_eq!(location.reg_class(), Some(RegClass::Xmm));
+    Operand {
+        partial: Some(PartialBits::low_64bits()),
+        ..Operand::from(location)
+    }
+}
+
+/// An abbreviated constructor for an operand that partially writes the low
+/// 64-bits of an XMM register.
+#[must_use]
+pub fn low64(location: Location) -> Operand {
+    assert_eq!(location.reg_class(), Some(RegClass::Xmm));
+    Operand {
+        partial: Some(PartialBits::low_64bits()),
+        ..Operand::from(location)
     }
 }
 
@@ -207,12 +254,16 @@ pub struct Operand {
     /// Some register operands are implicit: that is, they do not appear in the
     /// disassembled output even though they are used in the instruction.
     pub implicit: bool,
+    /// Some written-to operands are partial: that is, some bits of the register
+    /// are left unchanged. Since this can
+    pub partial: Option<PartialBits>,
 }
 
 impl core::fmt::Display for Operand {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let Self {
             location,
+            partial,
             mutability,
             extension,
             align,
@@ -220,6 +271,9 @@ impl core::fmt::Display for Operand {
         } = self;
         write!(f, "{location}")?;
         let mut flags = vec![];
+        if partial.is_some() {
+            flags.push(format!("partial"));
+        }
         if !matches!(mutability, Mutability::Read) {
             flags.push(format!("{mutability}"));
         }
@@ -245,17 +299,45 @@ impl From<Location> for Operand {
         let extension = Extension::default();
         let align = false;
         let implicit = false;
+        let partial = None;
         Self {
             location,
             mutability,
             extension,
             align,
             implicit,
+            partial,
         }
     }
 }
 
+/// Track partial writes to registers; which bits are written to?
+#[derive(Clone, Copy, Debug)]
+pub enum PartialBits {
+    /// We know the bits that are written to, as a bitmask.
+    Known(u128),
+    /// We do not know which bits are written to (e.g., data-driven lane
+    /// insertions).
+    Unknown,
+}
+
+impl PartialBits {
+    pub fn low_8bits() -> Self {
+        PartialBits::Known(0xFF)
+    }
+    pub fn low_16bits() -> Self {
+        PartialBits::Known(0xFF_FF)
+    }
+    pub fn low_32bits() -> Self {
+        PartialBits::Known(0xFF_FF_FF_FF)
+    }
+    pub fn low_64bits() -> Self {
+        PartialBits::Known(0xFF_FF_FF_FF_FF_FF_FF_FF)
+    }
+}
+
 /// The kind of register used in a [`Location`].
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RegClass {
     Gpr,
     Xmm,

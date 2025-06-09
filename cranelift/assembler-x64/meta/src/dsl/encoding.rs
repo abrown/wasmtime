@@ -15,8 +15,8 @@
 //!
 //! [link]: https://software.intel.com/content/www/us/en/develop/articles/intel-sdm.html
 
-use super::{Operand, OperandKind};
-use core::fmt;
+use super::Operand;
+use core::{fmt, panic};
 
 /// An abbreviated constructor for REX-encoded instructions.
 #[must_use]
@@ -57,6 +57,14 @@ impl Encoding {
         match self {
             Encoding::Rex(rex) => rex.validate(operands),
             Encoding::Vex(vex) => vex.validate(operands),
+        }
+    }
+
+    /// Return the `imm` field.
+    pub(crate) fn imm(&self) -> &Imm {
+        match self {
+            Encoding::Rex(rex) => &rex.imm,
+            Encoding::Vex(vex) => &vex.imm,
         }
     }
 }
@@ -307,18 +315,6 @@ impl Rex {
     /// _Instruction Format_, of the Intel® 64 and IA-32 Architectures Software
     /// Developer’s Manual, Volume 2A.
     fn validate(&self, operands: &[Operand]) {
-        if let Some(OperandKind::Imm(op)) = operands
-            .iter()
-            .map(|o| o.location.kind())
-            .find(|k| matches!(k, OperandKind::Imm(_)))
-        {
-            assert_eq!(
-                op.bits(),
-                self.imm.bits(),
-                "for an immediate, the encoding width must match the declared operand width"
-            );
-        }
-
         if let Some(opcode_mod) = &self.opcode_mod {
             assert!(
                 self.opcodes.primary & 0b111 == 0,
@@ -687,7 +683,7 @@ pub enum Imm {
 }
 
 impl Imm {
-    fn bits(&self) -> u16 {
+    pub fn bits(&self) -> u16 {
         match self {
             Self::None => 0,
             Self::ib => 8,
