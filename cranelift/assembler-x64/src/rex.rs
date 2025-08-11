@@ -2,10 +2,6 @@
 
 use crate::api::CodeSink;
 
-fn low8_will_sign_extend_to_32(xs: i32) -> bool {
-    xs == ((xs << 24) >> 24)
-}
-
 /// Encode the ModR/M byte.
 #[inline]
 pub(crate) fn encode_modrm(m0d: u8, enc_reg_g: u8, rm_e: u8) -> u8 {
@@ -28,7 +24,7 @@ pub(crate) fn encode_sib(scale: u8, enc_index: u8, enc_base: u8) -> u8 {
 /// sizes are used then it means a REX prefix is required.
 ///
 /// This function is used below in combination with `uses_8bit` booleans to
-/// determine the `RexPrefix::must_emit` flag. Table 3-2 in volume 1 of the
+/// determine the [`RexPrefix::must_emit`] flag. Table 3-2 in volume 1 of the
 /// Intel manual details how referencing `dil`, the low 8-bits of `rdi`,
 /// requires the use of the REX prefix as without it it would otherwise
 /// reference the `AH` register.
@@ -57,7 +53,7 @@ impl RexPrefix {
     ///
     /// Used with a single register operand:
     /// - `x` and `r` are unused.
-    /// - `b` extends the `reg` register, allowing access to r8-r15, or the top
+    /// - `b` extends the `enc` register, allowing access to r8-r15, or the top
     ///   bit of the opcode digit.
     #[inline]
     #[must_use]
@@ -67,11 +63,8 @@ impl RexPrefix {
         let r = 0;
         let x = 0;
         let b = (enc >> 3) & 1;
-        let flag = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
-        Self {
-            byte: flag,
-            must_emit,
-        }
+        let byte = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
+        Self { byte, must_emit }
     }
 
     /// Construct the [`RexPrefix`] for a binary instruction.
@@ -105,16 +98,13 @@ impl RexPrefix {
         let r = (enc_reg >> 3) & 1;
         let x = 0;
         let b = (enc_rm >> 3) & 1;
-        let flag = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
-        Self {
-            byte: flag,
-            must_emit,
-        }
+        let byte = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
+        Self { byte, must_emit }
     }
 
     /// Construct the [`RexPrefix`] for an instruction using an opcode digit.
     ///
-    /// :
+    /// Similar to [`RexPrefix::two_op`] except that:
     /// - `r` extends the opcode digit.
     /// - `x` is unused.
     /// - `b` extends the `reg` operand, allowing access to r8-r15.
@@ -145,11 +135,8 @@ impl RexPrefix {
         let r = (enc_reg >> 3) & 1;
         let x = (enc_index >> 3) & 1;
         let b = (enc_base >> 3) & 1;
-        let flag = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
-        Self {
-            byte: flag,
-            must_emit,
-        }
+        let byte = 0x40 | (w << 3) | (r << 2) | (x << 1) | b;
+        Self { byte, must_emit }
     }
 
     /// Possibly emit the REX prefix byte.
@@ -164,73 +151,70 @@ impl RexPrefix {
     }
 }
 
-/// The displacement bytes used after the ModR/M and SIB bytes.
-#[derive(Copy, Clone)]
-pub enum Disp {
-    None,
-    Imm8(i8),
-    Imm32(i32),
+/// Indicate the legacy opcode map used by an instruction.
+pub enum LegacyMap {
+    /// Legacy opcode map 0, which does not use an escape prefix.
+    SingleByte,
+    /// Legacy opcode map 1, which uses the escape prefix `0x0F`.
+    Escaped,
 }
 
-impl Disp {
-    /// Classifies the 32-bit immediate `val` as how this can be encoded
-    /// with ModRM/SIB bytes.
-    ///
-    /// For `evex_scaling` according to Section 2.7.5 of Intel's manual:
-    ///
-    /// > EVEX-encoded instructions always use a compressed displacement scheme
-    /// > by multiplying disp8 in conjunction with a scaling factor N that is
-    /// > determined based on the vector length, the value of EVEX.b bit
-    /// > (embedded broadcast) and the input element size of the instruction
-    ///
-    /// The `evex_scaling` factor provided here is `Some(N)` for EVEX
-    /// instructions.  This is taken into account where the `Imm` value
-    /// contained is the raw byte offset.
-    pub fn new(val: i32, evex_scaling: Option<i8>) -> Disp {
-        if val == 0 {
-            return Disp::None;
-        }
-        match evex_scaling {
-            Some(scaling) => {
-                if val % i32::from(scaling) == 0 {
-                    let scaled = val / i32::from(scaling);
-                    if low8_will_sign_extend_to_32(scaled) {
-                        return Disp::Imm8(scaled as i8);
-                    }
-                }
-                Disp::Imm32(val)
-            }
-            None => match i8::try_from(val) {
-                Ok(val) => Disp::Imm8(val),
-                Err(_) => Disp::Imm32(val),
-            },
-        }
-    }
-
-    /// Forces `Imm::None` to become `Imm::Imm8(0)`, used for special cases
-    /// where some base registers require an immediate.
-    pub fn force_immediate(&mut self) {
-        if let Disp::None = self {
-            *self = Disp::Imm8(0);
-        }
-    }
-
-    /// Returns the two "mod" bits present at the upper bits of the mod/rm
-    /// byte.
-    pub fn m0d(self) -> u8 {
+impl LegacyMap {
+    const fn bit(&self) -> u8 {
         match self {
-            Disp::None => 0b00,
-            Disp::Imm8(_) => 0b01,
-            Disp::Imm32(_) => 0b10,
+            LegacyMap::SingleByte => 0,
+            LegacyMap::Escaped => 1,
         }
     }
+}
 
-    /// Emit the truncated immediate into the code sink.
-    pub fn emit(self, sink: &mut impl CodeSink) {
-        match self {
-            Disp::None => {}
-            Disp::Imm8(n) => sink.put1(n as u8),
-            Disp::Imm32(n) => sink.put4(n as u32),
-        }
+/// Construct and emit the REX2 prefix bytes.
+///
+/// Intel APX adds the ability to use 16 extended general-purpose registers
+/// (EGPRs). The REX2 prefix, a two-byte prefix, adds two high bits to encode
+/// registers `r16`-`r31` for the `R`, `X`, and `B` fields::
+///
+/// ```text
+/// +------+  +--------------------------------------+
+/// | 0xD5 |  | M0 | R4 | X4 | B4 | W | R3 | X3 | B3 |
+/// +------+  +--------------------------------------+
+/// ```
+///
+/// [`Rex2Prefix`] can replace [`RexPrefix`] for instructions with a single-byte
+/// opcode (legacy opcode map 0, no escape prefix) and with a two-byte, escaped
+/// opcode (legacy opcode map 1, escape prefix `0x0F`). It cannot be used with
+/// three-byte opcodes (legacy opcode map 2--`0x0F38`--and 3--`0x0F3A`). The
+/// `M0` bit is set to `0` for [`LegacyMap::SingleByte`] and `1` for
+/// [`LegacyMap::Escaped`].
+///
+/// The `W` operates the same as in [`RexPrefix`].
+///
+/// Like [`RexPrefix`], when the operand size is 8 bits, the presence of the
+/// [`Rex2Prefix`] makes GPR encodings `4-7` address byte registers
+/// `[SPL,BPL,SIL,DIL]` instead of `[AH,CH,DH,BH]`.
+///
+/// For more details, see the Intel APX Architecture Specification, section
+/// 3.1.2.1.
+#[derive(Clone, Copy)]
+pub struct Rex2Prefix {
+    byte: u8,
+    must_emit: bool,
+}
+
+impl Rex2Prefix {
+    /// Construct the [`Rex2Prefix`] for a unary instruction.
+    ///
+    /// Used with a single register operand:
+    /// - `x` and `r` are unused.
+    /// - `b` extends the `enc` register, allowing access to r8-r31.
+    #[inline]
+    #[must_use]
+    pub const fn one_op(enc: u8, w_bit: bool, uses_8bit: bool, map: LegacyMap) -> Self {
+        let must_emit = uses_8bit && is_special_if_8bit(enc);
+        let w = if w_bit { 1 } else { 0 };
+        let b3 = (enc >> 3) & 1;
+        let b4 = (enc >> 4) & 1;
+        let byte = (map.bit() << 7) | (b4 << 4) | (w << 3) | b3;
+        Self { byte, must_emit }
     }
 }

@@ -2,7 +2,7 @@
 
 use crate::api::{AsReg, CodeSink, Constant, KnownOffset, Label, TrapCode};
 use crate::gpr::{self, NonRspGpr, Size};
-use crate::rex::{Disp, RexPrefix, encode_modrm, encode_sib};
+use crate::rex::{RexPrefix, encode_modrm, encode_sib};
 
 /// x64 memory addressing modes.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -390,6 +390,81 @@ impl<R: AsReg, M: AsReg> From<R> for XmmMem<R, M> {
 impl<R: AsReg, M: AsReg> From<Amode<M>> for XmmMem<R, M> {
     fn from(amode: Amode<M>) -> XmmMem<R, M> {
         XmmMem::Mem(amode)
+    }
+}
+
+/// The displacement bytes used after the ModR/M and SIB bytes.
+#[derive(Copy, Clone)]
+pub enum Disp {
+    None,
+    Imm8(i8),
+    Imm32(i32),
+}
+
+impl Disp {
+    /// Classifies the 32-bit immediate `val` as how this can be encoded
+    /// with ModRM/SIB bytes.
+    ///
+    /// For `evex_scaling` according to Section 2.7.5 of Intel's manual:
+    ///
+    /// > EVEX-encoded instructions always use a compressed displacement scheme
+    /// > by multiplying disp8 in conjunction with a scaling factor N that is
+    /// > determined based on the vector length, the value of EVEX.b bit
+    /// > (embedded broadcast) and the input element size of the instruction
+    ///
+    /// The `evex_scaling` factor provided here is `Some(N)` for EVEX
+    /// instructions.  This is taken into account where the `Imm` value
+    /// contained is the raw byte offset.
+    pub fn new(val: i32, evex_scaling: Option<i8>) -> Disp {
+        if val == 0 {
+            return Disp::None;
+        }
+        match evex_scaling {
+            Some(scaling) => {
+                if val % i32::from(scaling) == 0 {
+                    let scaled = val / i32::from(scaling);
+                    if Self::low8_will_sign_extend_to_32(scaled) {
+                        return Disp::Imm8(scaled as i8);
+                    }
+                }
+                Disp::Imm32(val)
+            }
+            None => match i8::try_from(val) {
+                Ok(val) => Disp::Imm8(val),
+                Err(_) => Disp::Imm32(val),
+            },
+        }
+    }
+
+    fn low8_will_sign_extend_to_32(xs: i32) -> bool {
+        xs == ((xs << 24) >> 24)
+    }
+
+    /// Forces `Imm::None` to become `Imm::Imm8(0)`, used for special cases
+    /// where some base registers require an immediate.
+    pub fn force_immediate(&mut self) {
+        if let Disp::None = self {
+            *self = Disp::Imm8(0);
+        }
+    }
+
+    /// Returns the two "mod" bits present at the upper bits of the mod/rm
+    /// byte.
+    pub fn m0d(self) -> u8 {
+        match self {
+            Disp::None => 0b00,
+            Disp::Imm8(_) => 0b01,
+            Disp::Imm32(_) => 0b10,
+        }
+    }
+
+    /// Emit the truncated immediate into the code sink.
+    pub fn emit(self, sink: &mut impl CodeSink) {
+        match self {
+            Disp::None => {}
+            Disp::Imm8(n) => sink.put1(n as u8),
+            Disp::Imm32(n) => sink.put4(n as u32),
+        }
     }
 }
 
