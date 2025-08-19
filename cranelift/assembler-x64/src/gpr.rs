@@ -134,6 +134,22 @@ pub mod enc {
     pub const R13: u8 = 13;
     pub const R14: u8 = 14;
     pub const R15: u8 = 15;
+    pub const R16: u8 = 16;
+    pub const R17: u8 = 17;
+    pub const R18: u8 = 18;
+    pub const R19: u8 = 19;
+    pub const R20: u8 = 20;
+    pub const R21: u8 = 21;
+    pub const R22: u8 = 22;
+    pub const R23: u8 = 23;
+    pub const R24: u8 = 24;
+    pub const R25: u8 = 25;
+    pub const R26: u8 = 26;
+    pub const R27: u8 = 27;
+    pub const R28: u8 = 28;
+    pub const R29: u8 = 29;
+    pub const R30: u8 = 30;
+    pub const R31: u8 = 31;
 
     /// Return the name of a GPR encoding (`enc`) at the given `size`.
     ///
@@ -238,6 +254,102 @@ pub mod enc {
                 Word => "%r15w",
                 Doubleword => "%r15d",
                 Quadword => "%r15",
+            },
+            R16 => match size {
+                Byte => "%r16b",
+                Word => "%r16w",
+                Doubleword => "%r16d",
+                Quadword => "%r16",
+            },
+            R17 => match size {
+                Byte => "%r17b",
+                Word => "%r17w",
+                Doubleword => "%r17d",
+                Quadword => "%r17",
+            },
+            R18 => match size {
+                Byte => "%r18b",
+                Word => "%r18w",
+                Doubleword => "%r18d",
+                Quadword => "%r18",
+            },
+            R19 => match size {
+                Byte => "%r19b",
+                Word => "%r19w",
+                Doubleword => "%r19d",
+                Quadword => "%r19",
+            },
+            R20 => match size {
+                Byte => "%r20b",
+                Word => "%r20w",
+                Doubleword => "%r20d",
+                Quadword => "%r20",
+            },
+            R21 => match size {
+                Byte => "%r21b",
+                Word => "%r21w",
+                Doubleword => "%r21d",
+                Quadword => "%r21",
+            },
+            R22 => match size {
+                Byte => "%r22b",
+                Word => "%r22w",
+                Doubleword => "%r22d",
+                Quadword => "%r22",
+            },
+            R23 => match size {
+                Byte => "%r23b",
+                Word => "%r23w",
+                Doubleword => "%r23d",
+                Quadword => "%r23",
+            },
+            R24 => match size {
+                Byte => "%r24b",
+                Word => "%r24w",
+                Doubleword => "%r24d",
+                Quadword => "%r24",
+            },
+            R25 => match size {
+                Byte => "%r25b",
+                Word => "%r25w",
+                Doubleword => "%r25d",
+                Quadword => "%r25",
+            },
+            R26 => match size {
+                Byte => "%r26b",
+                Word => "%r26w",
+                Doubleword => "%r26d",
+                Quadword => "%r26",
+            },
+            R27 => match size {
+                Byte => "%r27b",
+                Word => "%r27w",
+                Doubleword => "%r27d",
+                Quadword => "%r27",
+            },
+            R28 => match size {
+                Byte => "%r28b",
+                Word => "%r28w",
+                Doubleword => "%r28d",
+                Quadword => "%r28",
+            },
+            R29 => match size {
+                Byte => "%r29b",
+                Word => "%r29w",
+                Doubleword => "%r29d",
+                Quadword => "%r29",
+            },
+            R30 => match size {
+                Byte => "%r30b",
+                Word => "%r30w",
+                Doubleword => "%r30d",
+                Quadword => "%r30",
+            },
+            R31 => match size {
+                Byte => "%r31b",
+                Word => "%r31w",
+                Doubleword => "%r31d",
+                Quadword => "%r31",
             },
             _ => panic!("%invalid{enc}"),
         }

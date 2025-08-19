@@ -1171,6 +1171,7 @@ const fn windows_clobbers() -> PRegSet {
     use asm::xmm::enc::*;
 
     PRegSet::empty()
+        // Legacy GPRs.
         .with(regs::gpr_preg(RAX))
         .with(regs::gpr_preg(RCX))
         .with(regs::gpr_preg(RDX))
@@ -1178,12 +1179,47 @@ const fn windows_clobbers() -> PRegSet {
         .with(regs::gpr_preg(R9))
         .with(regs::gpr_preg(R10))
         .with(regs::gpr_preg(R11))
+        // Extended GPRs (APX/EVEX-only).
+        .with(regs::gpr_preg(R16))
+        .with(regs::gpr_preg(R17))
+        .with(regs::gpr_preg(R18))
+        .with(regs::gpr_preg(R19))
+        .with(regs::gpr_preg(R20))
+        .with(regs::gpr_preg(R21))
+        .with(regs::gpr_preg(R22))
+        .with(regs::gpr_preg(R23))
+        .with(regs::gpr_preg(R24))
+        .with(regs::gpr_preg(R25))
+        .with(regs::gpr_preg(R26))
+        .with(regs::gpr_preg(R27))
+        .with(regs::gpr_preg(R28))
+        .with(regs::gpr_preg(R29))
+        .with(regs::gpr_preg(R30))
+        .with(regs::gpr_preg(R31))
+        // Legacy XMM registers.
         .with(regs::fpr_preg(XMM0))
         .with(regs::fpr_preg(XMM1))
         .with(regs::fpr_preg(XMM2))
         .with(regs::fpr_preg(XMM3))
         .with(regs::fpr_preg(XMM4))
         .with(regs::fpr_preg(XMM5))
+        // Extended XMM registers (EVEX-only).
+        .with(regs::fpr_preg(XMM16))
+        .with(regs::fpr_preg(XMM17))
+        .with(regs::fpr_preg(XMM18))
+        .with(regs::fpr_preg(XMM19))
+        .with(regs::fpr_preg(XMM20))
+        .with(regs::fpr_preg(XMM21))
+        .with(regs::fpr_preg(XMM22))
+        .with(regs::fpr_preg(XMM23))
+        .with(regs::fpr_preg(XMM24))
+        .with(regs::fpr_preg(XMM25))
+        .with(regs::fpr_preg(XMM26))
+        .with(regs::fpr_preg(XMM27))
+        .with(regs::fpr_preg(XMM28))
+        .with(regs::fpr_preg(XMM29))
+        .with(regs::fpr_preg(XMM30))
+        .with(regs::fpr_preg(XMM31))
 }
 
 const fn sysv_clobbers() -> PRegSet {
@@ -1191,6 +1227,7 @@ const fn sysv_clobbers() -> PRegSet {
     use asm::xmm::enc::*;
 
     PRegSet::empty()
+        // Legacy GPRs.
         .with(regs::gpr_preg(RAX))
         .with(regs::gpr_preg(RCX))
         .with(regs::gpr_preg(RDX))
@@ -1200,6 +1237,24 @@ const fn sysv_clobbers() -> PRegSet {
         .with(regs::gpr_preg(R9))
         .with(regs::gpr_preg(R10))
         .with(regs::gpr_preg(R11))
+        // Extended GPRs (APX/EVEX-only).
+        .with(regs::gpr_preg(R16))
+        .with(regs::gpr_preg(R17))
+        .with(regs::gpr_preg(R18))
+        .with(regs::gpr_preg(R19))
+        .with(regs::gpr_preg(R20))
+        .with(regs::gpr_preg(R21))
+        .with(regs::gpr_preg(R22))
+        .with(regs::gpr_preg(R23))
+        .with(regs::gpr_preg(R24))
+        .with(regs::gpr_preg(R25))
+        .with(regs::gpr_preg(R26))
+        .with(regs::gpr_preg(R27))
+        .with(regs::gpr_preg(R28))
+        .with(regs::gpr_preg(R29))
+        .with(regs::gpr_preg(R30))
+        .with(regs::gpr_preg(R31))
+        // Legacy XMM registers.
         .with(regs::fpr_preg(XMM0))
         .with(regs::fpr_preg(XMM1))
         .with(regs::fpr_preg(XMM2))
@@ -1216,6 +1271,23 @@ const fn sysv_clobbers() -> PRegSet {
         .with(regs::fpr_preg(XMM13))
         .with(regs::fpr_preg(XMM14))
         .with(regs::fpr_preg(XMM15))
+        // Extended XMM registers (EVEX-only).
+        .with(regs::fpr_preg(XMM16))
+        .with(regs::fpr_preg(XMM17))
+        .with(regs::fpr_preg(XMM18))
+        .with(regs::fpr_preg(XMM19))
+        .with(regs::fpr_preg(XMM20))
+        .with(regs::fpr_preg(XMM21))
+        .with(regs::fpr_preg(XMM22))
+        .with(regs::fpr_preg(XMM23))
+        .with(regs::fpr_preg(XMM24))
+        .with(regs::fpr_preg(XMM25))
+        .with(regs::fpr_preg(XMM26))
+        .with(regs::fpr_preg(XMM27))
+        .with(regs::fpr_preg(XMM28))
+        .with(regs::fpr_preg(XMM29))
+        .with(regs::fpr_preg(XMM30))
+        .with(regs::fpr_preg(XMM31))
 }
 
 /// For calling conventions that clobber all registers.
@@ -1224,6 +1296,7 @@ const fn all_clobbers() -> PRegSet {
     use asm::xmm::enc::*;
 
     PRegSet::empty()
+        // Legacy GPRs.
         .with(regs::gpr_preg(RAX))
         .with(regs::gpr_preg(RCX))
         .with(regs::gpr_preg(RDX))
@@ -1238,6 +1311,24 @@ const fn all_clobbers() -> PRegSet {
         .with(regs::gpr_preg(R13))
         .with(regs::gpr_preg(R14))
         .with(regs::gpr_preg(R15))
+        // Extended GPRs (APX/EVEX-only).
+        .with(regs::gpr_preg(R16))
+        .with(regs::gpr_preg(R17))
+        .with(regs::gpr_preg(R18))
+        .with(regs::gpr_preg(R19))
+        .with(regs::gpr_preg(R20))
+        .with(regs::gpr_preg(R21))
+        .with(regs::gpr_preg(R22))
+        .with(regs::gpr_preg(R23))
+        .with(regs::gpr_preg(R24))
+        .with(regs::gpr_preg(R25))
+        .with(regs::gpr_preg(R26))
+        .with(regs::gpr_preg(R27))
+        .with(regs::gpr_preg(R28))
+        .with(regs::gpr_preg(R29))
+        .with(regs::gpr_preg(R30))
+        .with(regs::gpr_preg(R31))
+        // Legacy XMM registers.
         .with(regs::fpr_preg(XMM0))
         .with(regs::fpr_preg(XMM1))
         .with(regs::fpr_preg(XMM2))
@@ -1254,6 +1345,23 @@ const fn all_clobbers() -> PRegSet {
         .with(regs::fpr_preg(XMM13))
         .with(regs::fpr_preg(XMM14))
         .with(regs::fpr_preg(XMM15))
+        // Extended XMM registers (EVEX-only).
+        .with(regs::fpr_preg(XMM16))
+        .with(regs::fpr_preg(XMM17))
+        .with(regs::fpr_preg(XMM18))
+        .with(regs::fpr_preg(XMM19))
+        .with(regs::fpr_preg(XMM20))
+        .with(regs::fpr_preg(XMM21))
+        .with(regs::fpr_preg(XMM22))
+        .with(regs::fpr_preg(XMM23))
+        .with(regs::fpr_preg(XMM24))
+        .with(regs::fpr_preg(XMM25))
+        .with(regs::fpr_preg(XMM26))
+        .with(regs::fpr_preg(XMM27))
+        .with(regs::fpr_preg(XMM28))
+        .with(regs::fpr_preg(XMM29))
+        .with(regs::fpr_preg(XMM30))
+        .with(regs::fpr_preg(XMM31))
 }
 
 fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
@@ -1291,16 +1399,35 @@ fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
             vec![],
         ],
         non_preferred_regs_by_class: [
-            // Non-preferred GPRs: callee-saved in the SysV ABI.
+            // Non-preferred GPRs.
             vec![
+                // Callee-saved in the SysV ABI.
                 preg(regs::rbx()),
                 preg(regs::r12()),
                 preg(regs::r13()),
                 preg(regs::r14()),
+                // Only available for APX/EVEX encoded instructions.
+                preg(regs::r16()),
+                preg(regs::r17()),
+                preg(regs::r18()),
+                preg(regs::r19()),
+                preg(regs::r20()),
+                preg(regs::r21()),
+                preg(regs::r22()),
+                preg(regs::r23()),
+                preg(regs::r24()),
+                preg(regs::r25()),
+                preg(regs::r26()),
+                preg(regs::r27()),
+                preg(regs::r28()),
+                preg(regs::r29()),
+                preg(regs::r30()),
+                preg(regs::r31()),
             ],
-            // Non-preferred XMMs: the last 8 registers, which can have larger
-            // encodings with AVX instructions.
+            // Non-preferred XMMs:
             vec![
+                // The last 8 registers, which can have larger encodings with
+                // AVX instructions.
                 preg(regs::xmm8()),
                 preg(regs::xmm9()),
                 preg(regs::xmm10()),
@@ -1309,6 +1436,23 @@ fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
                 preg(regs::xmm13()),
                 preg(regs::xmm14()),
                 preg(regs::xmm15()),
+                // Only available for EVEX encoded instructions.
+                preg(regs::xmm16()),
+                preg(regs::xmm17()),
+                preg(regs::xmm18()),
+                preg(regs::xmm19()),
+                preg(regs::xmm20()),
+                preg(regs::xmm21()),
+                preg(regs::xmm22()),
+                preg(regs::xmm23()),
+                preg(regs::xmm24()),
+                preg(regs::xmm25()),
+                preg(regs::xmm26()),
+                preg(regs::xmm27()),
+                preg(regs::xmm28()),
+                preg(regs::xmm29()),
+                preg(regs::xmm30()),
+                preg(regs::xmm31()),
             ],
             // The Vector Regclass is unused
             vec![],

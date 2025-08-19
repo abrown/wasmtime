@@ -82,6 +82,22 @@ pub mod enc {
     pub const XMM13: u8 = 13;
     pub const XMM14: u8 = 14;
     pub const XMM15: u8 = 15;
+    pub const XMM16: u8 = 16;
+    pub const XMM17: u8 = 17;
+    pub const XMM18: u8 = 18;
+    pub const XMM19: u8 = 19;
+    pub const XMM20: u8 = 20;
+    pub const XMM21: u8 = 21;
+    pub const XMM22: u8 = 22;
+    pub const XMM23: u8 = 23;
+    pub const XMM24: u8 = 24;
+    pub const XMM25: u8 = 25;
+    pub const XMM26: u8 = 26;
+    pub const XMM27: u8 = 27;
+    pub const XMM28: u8 = 28;
+    pub const XMM29: u8 = 29;
+    pub const XMM30: u8 = 30;
+    pub const XMM31: u8 = 31;
 
     /// Return the name of a XMM encoding (`enc`).
     ///
@@ -106,6 +122,22 @@ pub mod enc {
             XMM13 => "%xmm13",
             XMM14 => "%xmm14",
             XMM15 => "%xmm15",
+            XMM16 => "%xmm16",
+            XMM17 => "%xmm17",
+            XMM18 => "%xmm18",
+            XMM19 => "%xmm19",
+            XMM20 => "%xmm20",
+            XMM21 => "%xmm21",
+            XMM22 => "%xmm22",
+            XMM23 => "%xmm23",
+            XMM24 => "%xmm24",
+            XMM25 => "%xmm25",
+            XMM26 => "%xmm26",
+            XMM27 => "%xmm27",
+            XMM28 => "%xmm28",
+            XMM29 => "%xmm29",
+            XMM30 => "%xmm30",
+            XMM31 => "%xmm31",
             _ => panic!("%invalid{enc}"),
         }
     }

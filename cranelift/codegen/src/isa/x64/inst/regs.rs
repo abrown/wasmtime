@@ -69,6 +69,54 @@ pub(crate) const fn r14() -> Reg {
 pub(crate) const fn r15() -> Reg {
     gpr(gpr::enc::R15)
 }
+pub(crate) const fn r16() -> Reg {
+    gpr(gpr::enc::R16)
+}
+pub(crate) const fn r17() -> Reg {
+    gpr(gpr::enc::R17)
+}
+pub(crate) const fn r18() -> Reg {
+    gpr(gpr::enc::R18)
+}
+pub(crate) const fn r19() -> Reg {
+    gpr(gpr::enc::R19)
+}
+pub(crate) const fn r20() -> Reg {
+    gpr(gpr::enc::R20)
+}
+pub(crate) const fn r21() -> Reg {
+    gpr(gpr::enc::R21)
+}
+pub(crate) const fn r22() -> Reg {
+    gpr(gpr::enc::R22)
+}
+pub(crate) const fn r23() -> Reg {
+    gpr(gpr::enc::R23)
+}
+pub(crate) const fn r24() -> Reg {
+    gpr(gpr::enc::R24)
+}
+pub(crate) const fn r25() -> Reg {
+    gpr(gpr::enc::R25)
+}
+pub(crate) const fn r26() -> Reg {
+    gpr(gpr::enc::R26)
+}
+pub(crate) const fn r27() -> Reg {
+    gpr(gpr::enc::R27)
+}
+pub(crate) const fn r28() -> Reg {
+    gpr(gpr::enc::R28)
+}
+pub(crate) const fn r29() -> Reg {
+    gpr(gpr::enc::R29)
+}
+pub(crate) const fn r30() -> Reg {
+    gpr(gpr::enc::R30)
+}
+pub(crate) const fn r31() -> Reg {
+    gpr(gpr::enc::R31)
+}
 
 /// The pinned register on this architecture.
 /// It must be the same as Spidermonkey's HeapReg, as found in this file.
@@ -133,6 +181,54 @@ pub(crate) const fn xmm14() -> Reg {
 }
 pub(crate) const fn xmm15() -> Reg {
     fpr(xmm::enc::XMM15)
+}
+pub(crate) const fn xmm16() -> Reg {
+    fpr(xmm::enc::XMM16)
+}
+pub(crate) const fn xmm17() -> Reg {
+    fpr(xmm::enc::XMM17)
+}
+pub(crate) const fn xmm18() -> Reg {
+    fpr(xmm::enc::XMM18)
+}
+pub(crate) const fn xmm19() -> Reg {
+    fpr(xmm::enc::XMM19)
+}
+pub(crate) const fn xmm20() -> Reg {
+    fpr(xmm::enc::XMM20)
+}
+pub(crate) const fn xmm21() -> Reg {
+    fpr(xmm::enc::XMM21)
+}
+pub(crate) const fn xmm22() -> Reg {
+    fpr(xmm::enc::XMM22)
+}
+pub(crate) const fn xmm23() -> Reg {
+    fpr(xmm::enc::XMM23)
+}
+pub(crate) const fn xmm24() -> Reg {
+    fpr(xmm::enc::XMM24)
+}
+pub(crate) const fn xmm25() -> Reg {
+    fpr(xmm::enc::XMM25)
+}
+pub(crate) const fn xmm26() -> Reg {
+    fpr(xmm::enc::XMM26)
+}
+pub(crate) const fn xmm27() -> Reg {
+    fpr(xmm::enc::XMM27)
+}
+pub(crate) const fn xmm28() -> Reg {
+    fpr(xmm::enc::XMM28)
+}
+pub(crate) const fn xmm29() -> Reg {
+    fpr(xmm::enc::XMM29)
+}
+pub(crate) const fn xmm30() -> Reg {
+    fpr(xmm::enc::XMM30)
+}
+pub(crate) const fn xmm31() -> Reg {
+    fpr(xmm::enc::XMM31)
 }
 
 // N.B.: this is not an `impl PrettyPrint for Reg` because it is
