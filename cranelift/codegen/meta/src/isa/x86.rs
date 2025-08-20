@@ -8,89 +8,88 @@ pub(crate) fn define() -> TargetIsa {
     let has_sse3 = settings.add_bool(
         "has_sse3",
         "Has support for SSE3.",
-        "SSE3: CPUID.01H:ECX.SSE3[bit 0]",
+        "SSE3: CPUID.(EAX=01H):ECX.SSE3[bit 0]",
         false,
     );
     let has_ssse3 = settings.add_bool(
         "has_ssse3",
         "Has support for SSSE3.",
-        "SSSE3: CPUID.01H:ECX.SSSE3[bit 9]",
+        "SSSE3: CPUID.(EAX=01H):ECX.SSSE3[bit 9]",
         false,
     );
     let has_cmpxchg16b = settings.add_bool(
         "has_cmpxchg16b",
         "Has support for CMPXCHG16b.",
-        "CMPXCHG16b: CPUID.01H:ECX.CMPXCHG16B[bit 13]",
+        "CMPXCHG16b: CPUID.(EAX=01H):ECX.CMPXCHG16B[bit 13]",
         false,
     );
     let has_sse41 = settings.add_bool(
         "has_sse41",
         "Has support for SSE4.1.",
-        "SSE4.1: CPUID.01H:ECX.SSE4_1[bit 19]",
+        "SSE4.1: CPUID.(EAX=01H):ECX.SSE4_1[bit 19]",
         false,
     );
     let has_sse42 = settings.add_bool(
         "has_sse42",
         "Has support for SSE4.2.",
-        "SSE4.2: CPUID.01H:ECX.SSE4_2[bit 20]",
+        "SSE4.2: CPUID.(EAX=01H):ECX.SSE4_2[bit 20]",
         false,
     );
     let has_avx = settings.add_bool(
         "has_avx",
         "Has support for AVX.",
-        "AVX: CPUID.01H:ECX.AVX[bit 28]",
+        "AVX: CPUID.(EAX=01H):ECX.AVX[bit 28]",
         false,
     );
     let has_avx2 = settings.add_bool(
         "has_avx2",
         "Has support for AVX2.",
-        "AVX2: CPUID.07H:EBX.AVX2[bit 5]",
+        "AVX2: CPUID.(EAX=07H):EBX.AVX2[bit 5]",
         false,
     );
     let has_fma = settings.add_bool(
         "has_fma",
         "Has support for FMA.",
-        "FMA: CPUID.01H:ECX.FMA[bit 12]",
+        "FMA: CPUID.(EAX=01H):ECX.FMA[bit 12]",
         false,
     );
     let has_avx512bitalg = settings.add_bool(
         "has_avx512bitalg",
         "Has support for AVX512BITALG.",
-        "AVX512BITALG: CPUID.07H:ECX.AVX512BITALG[bit 12]",
+        "AVX512BITALG: CPUID.(EAX=07H):ECX.AVX512BITALG[bit 12]",
         false,
     );
     let has_avx512dq = settings.add_bool(
         "has_avx512dq",
         "Has support for AVX512DQ.",
-        "AVX512DQ: CPUID.07H:EBX.AVX512DQ[bit 17]",
+        "AVX512DQ: CPUID.(EAX=07H):EBX.AVX512DQ[bit 17]",
         false,
     );
     let has_avx512vl = settings.add_bool(
         "has_avx512vl",
         "Has support for AVX512VL.",
-        "AVX512VL: CPUID.07H:EBX.AVX512VL[bit 31]",
+        "AVX512VL: CPUID.(EAX=07H):EBX.AVX512VL[bit 31]",
         false,
     );
     let has_avx512vbmi = settings.add_bool(
         "has_avx512vbmi",
         "Has support for AVX512VMBI.",
-        "AVX512VBMI: CPUID.07H:ECX.AVX512VBMI[bit 1]",
+        "AVX512VBMI: CPUID.(EAX=07H):ECX.AVX512VBMI[bit 1]",
         false,
     );
     let has_avx512f = settings.add_bool(
         "has_avx512f",
         "Has support for AVX512F.",
-        "AVX512F: CPUID.07H:EBX.AVX512F[bit 16]",
+        "AVX512F: CPUID.(EAX=07H):EBX.AVX512F[bit 16]",
         false,
     );
     let has_popcnt = settings.add_bool(
         "has_popcnt",
         "Has support for POPCNT.",
-        "POPCNT: CPUID.01H:ECX.POPCNT[bit 23]",
+        "POPCNT: CPUID.(EAX=01H):ECX.POPCNT[bit 23]",
         false,
     );
 
-    // CPUID.(EAX=07H, ECX=0H):EBX
     let has_bmi1 = settings.add_bool(
         "has_bmi1",
         "Has support for BMI1.",
@@ -104,11 +103,17 @@ pub(crate) fn define() -> TargetIsa {
         false,
     );
 
-    // CPUID.EAX=80000001H:ECX
     let has_lzcnt = settings.add_bool(
         "has_lzcnt",
         "Has support for LZCNT.",
-        "LZCNT: CPUID.EAX=80000001H:ECX.LZCNT[bit 5]",
+        "LZCNT: CPUID.(EAX=80000001H):ECX.LZCNT[bit 5]",
+        false,
+    );
+
+    let has_apx = settings.add_bool(
+        "has_apx",
+        "Has support for APX.",
+        "APX_F: CPUID.(EAX=07H, ECX=1H):EDX.APX_F[bit 21]",
         false,
     );
 
@@ -131,6 +136,7 @@ pub(crate) fn define() -> TargetIsa {
     settings.add_predicate("use_bmi1", predicate!(has_bmi1));
     settings.add_predicate("use_bmi2", predicate!(has_bmi2));
     settings.add_predicate("use_lzcnt", predicate!(has_lzcnt));
+    settings.add_predicate("use_apx", predicate!(has_apx));
 
     let sse3 = settings.add_preset("sse3", "SSE3 and earlier.", preset!(has_sse3));
     let ssse3 = settings.add_preset("ssse3", "SSSE3 and earlier.", preset!(sse3 && has_ssse3));
