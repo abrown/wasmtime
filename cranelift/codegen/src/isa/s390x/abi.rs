@@ -860,7 +860,11 @@ impl ABIMachineSpec for S390xMachineDeps {
         }
     }
 
-    fn get_machine_env(_flags: &settings::Flags, call_conv: isa::CallConv) -> &MachineEnv {
+    fn get_machine_env<'a>(
+        _flags: &settings::Flags,
+        _isa_flags: &Self::F,
+        call_conv: isa::CallConv,
+    ) -> &'a MachineEnv {
         match call_conv {
             isa::CallConv::Tail => {
                 static TAIL_MACHINE_ENV: OnceLock<MachineEnv> = OnceLock::new();

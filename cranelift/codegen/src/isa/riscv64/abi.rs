@@ -608,7 +608,11 @@ impl ABIMachineSpec for Riscv64MachineDeps {
         }
     }
 
-    fn get_machine_env(_flags: &settings::Flags, _call_conv: isa::CallConv) -> &MachineEnv {
+    fn get_machine_env<'a>(
+        _flags: &settings::Flags,
+        _isa_flags: &Self::F,
+        _call_conv: isa::CallConv,
+    ) -> &'a MachineEnv {
         static MACHINE_ENV: OnceLock<MachineEnv> = OnceLock::new();
         MACHINE_ENV.get_or_init(create_reg_environment)
     }

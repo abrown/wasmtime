@@ -866,13 +866,18 @@ impl ABIMachineSpec for X64ABIMachineSpec {
         }
     }
 
-    fn get_machine_env(flags: &settings::Flags, _call_conv: isa::CallConv) -> &MachineEnv {
+    fn get_machine_env<'a>(
+        flags: &settings::Flags,
+        isa_flags: &Self::F,
+        _call_conv: isa::CallConv,
+    ) -> &'a MachineEnv {
+        // TODO: can `isa_flags` change between calls to this function?
         if flags.enable_pinned_reg() {
             static MACHINE_ENV: OnceLock<MachineEnv> = OnceLock::new();
-            MACHINE_ENV.get_or_init(|| create_reg_env_systemv(true))
+            MACHINE_ENV.get_or_init(|| create_reg_env_systemv(isa_flags, true))
         } else {
             static MACHINE_ENV: OnceLock<MachineEnv> = OnceLock::new();
-            MACHINE_ENV.get_or_init(|| create_reg_env_systemv(false))
+            MACHINE_ENV.get_or_init(|| create_reg_env_systemv(isa_flags, false))
         }
     }
 
@@ -1364,7 +1369,7 @@ const fn all_clobbers() -> PRegSet {
         .with(regs::fpr_preg(XMM31))
 }
 
-fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
+fn create_reg_env_systemv(isa_flags: &x64_settings::Flags, enable_pinned_reg: bool) -> MachineEnv {
     fn preg(r: Reg) -> PReg {
         r.to_real_reg().unwrap().into()
     }
@@ -1399,35 +1404,16 @@ fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
             vec![],
         ],
         non_preferred_regs_by_class: [
-            // Non-preferred GPRs.
+            // Non-preferred GPRs: callee-saved in the SysV ABI.
             vec![
-                // Callee-saved in the SysV ABI.
                 preg(regs::rbx()),
                 preg(regs::r12()),
                 preg(regs::r13()),
                 preg(regs::r14()),
-                // Only available for APX/EVEX encoded instructions.
-                preg(regs::r16()),
-                preg(regs::r17()),
-                preg(regs::r18()),
-                preg(regs::r19()),
-                preg(regs::r20()),
-                preg(regs::r21()),
-                preg(regs::r22()),
-                preg(regs::r23()),
-                preg(regs::r24()),
-                preg(regs::r25()),
-                preg(regs::r26()),
-                preg(regs::r27()),
-                preg(regs::r28()),
-                preg(regs::r29()),
-                preg(regs::r30()),
-                preg(regs::r31()),
             ],
-            // Non-preferred XMMs:
+            // Non-preferred XMMs: the last 8 registers, which can have larger
+            // encodings with AVX instructions.
             vec![
-                // The last 8 registers, which can have larger encodings with
-                // AVX instructions.
                 preg(regs::xmm8()),
                 preg(regs::xmm9()),
                 preg(regs::xmm10()),
@@ -1436,23 +1422,6 @@ fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
                 preg(regs::xmm13()),
                 preg(regs::xmm14()),
                 preg(regs::xmm15()),
-                // Only available for EVEX encoded instructions.
-                preg(regs::xmm16()),
-                preg(regs::xmm17()),
-                preg(regs::xmm18()),
-                preg(regs::xmm19()),
-                preg(regs::xmm20()),
-                preg(regs::xmm21()),
-                preg(regs::xmm22()),
-                preg(regs::xmm23()),
-                preg(regs::xmm24()),
-                preg(regs::xmm25()),
-                preg(regs::xmm26()),
-                preg(regs::xmm27()),
-                preg(regs::xmm28()),
-                preg(regs::xmm29()),
-                preg(regs::xmm30()),
-                preg(regs::xmm31()),
             ],
             // The Vector Regclass is unused
             vec![],
@@ -1461,9 +1430,50 @@ fn create_reg_env_systemv(enable_pinned_reg: bool) -> MachineEnv {
         scratch_by_class: [None, None, None],
     };
 
+    // Only available if `r15` is not pinned.
     debug_assert_eq!(regs::r15(), regs::pinned_reg());
     if !enable_pinned_reg {
         env.non_preferred_regs_by_class[0].push(preg(regs::r15()));
+    }
+
+    // Only available for APX/EVEX encoded instructions.
+    if isa_flags.use_apx() {
+        env.non_preferred_regs_by_class[0].push(preg(regs::r16()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r17()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r18()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r19()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r20()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r21()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r22()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r23()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r24()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r25()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r26()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r27()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r28()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r29()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r30()));
+        env.non_preferred_regs_by_class[0].push(preg(regs::r31()));
+    }
+
+    // Only available for EVEX encoded instructions.
+    if isa_flags.use_avx512vl() {
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm16()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm17()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm18()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm19()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm20()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm21()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm22()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm23()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm24()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm25()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm26()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm27()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm28()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm29()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm30()));
+        env.non_preferred_regs_by_class[1].push(preg(regs::xmm31()));
     }
 
     env
