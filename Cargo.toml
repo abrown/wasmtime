@@ -308,7 +308,7 @@ component-async-tests = { path = "crates/misc/component-async-tests" }
 
 # Bytecode Alliance maintained dependencies:
 # ---------------------------
-regalloc2 = "0.13.2"
+regalloc2 = { git = "https://github.com/abrown/regalloc2", branch = "limit-constraints" }
 
 # cap-std family:
 target-lexicon = "0.13.0"
